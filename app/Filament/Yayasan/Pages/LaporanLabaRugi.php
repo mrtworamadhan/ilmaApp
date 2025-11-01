@@ -29,7 +29,7 @@ class LaporanLabaRugi extends Page implements HasForms
     protected static ?string $navigationLabel = 'Laporan Laba Rugi';
     protected string $view = 'filament.yayasan.pages.laporan-laba-rugi';
     protected static string | UnitEnum | null $navigationGroup  = 'Laporan';
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 4;
     protected static ?string $slug = 'laporan/laba-rugi';
 
     // --- 4. Properti untuk menampung filter & hasil ---
@@ -43,6 +43,11 @@ class LaporanLabaRugi extends Page implements HasForms
     public $hasilBeban = [];
     public $totalBeban = 0;
     public $labaRugi = 0;
+    public static function canAccess(): bool
+    {
+        // Ini sudah benar
+        return auth()->user()->hasRole(['Admin Yayasan', 'Admin Sekolah']);
+    }
 
     public function mount(): void
     {

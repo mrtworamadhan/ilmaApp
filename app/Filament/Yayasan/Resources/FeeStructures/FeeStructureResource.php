@@ -28,12 +28,23 @@ class FeeStructureResource extends Resource
     protected static ?string $slug = 'manajemen-biaya';
     protected static string | UnitEnum | null $navigationGroup  = 'Manajemen Biaya';
     protected static ?int $navigationSort = 1;
+    public static function canViewAny(): bool
+    {
+        return auth()->user()->hasRole(['Admin Yayasan', 'Admin Sekolah']);
+    }
 
     public static function getEloquentQuery(): Builder
     {
-        // Otomatis filter data berdasarkan Yayasan yang login
-        return parent::getEloquentQuery()
-            ->where('foundation_id', Filament::getTenant()->id);
+        $query = parent::getEloquentQuery()
+                    ->where('foundation_id', Filament::getTenant()->id);
+
+        $userSchoolId = auth()->user()->school_id;
+        
+        if ($userSchoolId) {
+            $query->where('school_id', $userSchoolId);
+        }
+
+        return $query;
     }
 
     public static function form(Schema $schema): Schema

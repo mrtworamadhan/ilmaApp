@@ -29,14 +29,19 @@ class LaporanTunggakan extends Page implements HasForms, HasTable
     use InteractsWithForms, InteractsWithTable;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
+    protected static string | UnitEnum | null $navigationGroup  = 'Laporan';
     protected static ?string $navigationLabel = 'Laporan Tunggakan';
     protected string $view = 'filament.yayasan.pages.laporan-tunggakan';
-    protected static string | UnitEnum | null $navigationGroup  = 'Laporan';
-    protected static ?int $navigationSort = 1;
+    protected static ?int $navigationSort = 2;
     protected static ?string $slug = 'laporan/tunggakan';
 
     // Hapus property individual, gunakan array filters saja
     public array $filters = [];
+    public static function canAccess(): bool
+    {
+        // Ini sudah benar
+        return auth()->user()->hasRole(['Admin Yayasan', 'Admin Sekolah']);
+    }
 
     public function mount(): void
     {
@@ -120,7 +125,6 @@ class LaporanTunggakan extends Page implements HasForms, HasTable
             : $userSchoolId;
     }
 
-    // --- Definisi Tabel Hasil ---
     public function table(Table $table): Table
     {
         return $table

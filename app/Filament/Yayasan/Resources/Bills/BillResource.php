@@ -28,6 +28,10 @@ class BillResource extends Resource
     protected static ?string $slug = 'tagihan';
     protected static string | UnitEnum | null $navigationGroup  = 'Manajemen Biaya';
     protected static ?int $navigationSort = 3;
+    public static function canViewAny(): bool
+    {
+        return auth()->user()->hasRole(['Admin Yayasan', 'Admin Sekolah']);
+    }
     public static function getEloquentQuery(): Builder
     {
         // 1. Ambil query dasar (sudah di-scope ke Tenant/Yayasan)

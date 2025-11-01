@@ -39,6 +39,11 @@ class SchoolClassResource extends Resource
     protected static string | UnitEnum | null $navigationGroup  = 'Manajemen Siswa';
     protected static ?int $navigationSort = 1;
 
+    public static function canViewAny(): bool
+    {
+        return auth()->user()->hasRole(['Admin Yayasan', 'Admin Sekolah']);
+    }
+
     public static function form(Schema $schema): Schema
     {
         $isYayasanUser = auth()->user()->school_id === null;

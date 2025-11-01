@@ -3,6 +3,7 @@
 namespace App\Filament\Yayasan\Resources\Expenses\Schemas;
 
 use App\Models\Account;
+use App\Models\DisbursementRequest;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Hidden;
@@ -46,7 +47,16 @@ class ExpenseForm
                     ->preload()
                     ->hidden(!$isYayasanUser), // Sembunyikan jika bukan Admin Yayasan
 
-                // 2. Field Tersembunyi (Hanya untuk Admin Sekolah)
+                Select::make('disbursement_request_id')
+                    ->label('Terkait Pengajuan Pencairan?')
+                    ->options(
+                        DisbursementRequest::where('status', 'APPROVED') // <-- Hanya tampilkan yg sudah disetujui
+                            ->pluck('id', 'id') // Tampilkan ID atau deskripsi
+                            // Anda bisa kustomisasi format opsi ini
+                    )
+                    ->searchable()
+                    ->nullable(),
+                    // 2. Field Tersembunyi (Hanya untuk Admin Sekolah)
                 Hidden::make('school_id')
                     ->default($userSchoolId)
                     ->hidden($isYayasanUser), // Sembunyikan jika Admin Yayasan

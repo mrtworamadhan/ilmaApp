@@ -24,7 +24,7 @@ class UsersTable
                     ->label('Email Login')
                     ->searchable(),
                 
-                TextColumn::make('role')
+                TextColumn::make('roles.name')
                     ->label('Role')
                     ->badge(),
                 

@@ -28,6 +28,10 @@ class FeeCategoryResource extends Resource
     protected static ?string $slug = 'kategori-biaya';
     protected static string | UnitEnum | null $navigationGroup  = 'Manajemen Biaya';
     protected static ?int $navigationSort = 2;
+    public static function canViewAny(): bool
+    {
+        return auth()->user()->hasRole(['Admin Yayasan', 'Admin Sekolah']);
+    }
     public static function getEloquentQuery(): Builder
     {
         // Otomatis filter data berdasarkan Yayasan yang login

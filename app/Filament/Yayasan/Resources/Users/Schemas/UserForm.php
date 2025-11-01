@@ -2,33 +2,27 @@
 
 namespace App\Filament\Yayasan\Resources\Users\Schemas;
 
-use Filament\Forms\Components\DateTimePicker;
-use Filament\Forms\Components\Hidden;
+use App\Models\Department;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Schema;
-use Filament\Forms\Get;
+use Filament\Forms\Get; // <-- Ubah use statement ini
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Database\Eloquent\Builder;
 use Filament\Facades\Filament;
+use Spatie\Permission\Models\Role; // <-- Pastikan ini ada
 
 class UserForm
 {
     public static function configure(Schema $schema): Schema
     {
-        $isYayasanUser = auth()->user()->school_id === null;
+        // 1. Dapatkan user yang sedang login
+        $loggedInUser = auth()->user();
+            
+        // 2. Tentukan apakah dia Admin Yayasan (true) atau Admin Sekolah (false)
+        $isYayasanUser = $loggedInUser->school_id === null;
 
-        $roles = [
-            'admin_sekolah' => 'Admin Sekolah',
-            'bendahara_sekolah' => 'Bendahara Sekolah',
-            'guru' => 'Guru',
-            'orangtua' => 'Orang Tua',
-        ];
-
-        if ($isYayasanUser) {
-            $roles['admin_yayasan'] = 'Admin Yayasan';
-            $roles['bendahara_yayasan'] = 'Bendahara Yayasan';
-        }
         return $schema
             ->components([
                 TextInput::make('name')
@@ -41,24 +35,22 @@ class UserForm
                     ->required()
                     ->unique(ignoreRecord: true),
                 
-                // Field password hanya muncul saat 'Create'
                 TextInput::make('password')
                     ->label('Password')
                     ->password()
                     ->required()
                     ->minLength(8)
-                    ->dehydrateStateUsing(fn (string $state): string => Hash::make($state)) // Hash password
-                    ->visibleOn('create'), // Hanya tampil saat buat baru
+                    ->dehydrateStateUsing(fn (string $state): string => Hash::make($state))
+                    ->visibleOn('create'),
                 
-                Select::make('role')
-                    ->label('Role / Hak Akses')
-                    ->options($roles) // Gunakan daftar role dinamis
+                Select::make('roles')
+                    ->multiple()
+                    ->relationship('roles', 'name')
+                    ->preload()
+                    ->searchable()
                     ->required()
-                    ->reactive(), // <-- Penting agar field school_id bereaksi
+                    ->live(),
 
-                // --- LOGIKA MULTI-LEVEL UNTUK SEKOLAH ---
-
-                // 1. Dropdown Sekolah (Hanya untuk Admin Yayasan)
                 Select::make('school_id')
                     ->label('Ditugaskan di Sekolah')
                     ->relationship(
@@ -69,23 +61,51 @@ class UserForm
                     )
                     ->searchable()
                     ->preload()
-                    // Tampil HANYA jika:
-                    // 1. User = Admin Yayasan
-                    // 2. Role yang dipilih BUKAN role level yayasan
-                    ->visible(fn (\Filament\Schemas\Components\Utilities\Get $get): bool => 
-                        $isYayasanUser && 
-                        !in_array($get('role'), ['admin_yayasan', 'bendahara_yayasan'])
-                    )
-                    // Wajib diisi JIKA terlihat
-                    ->required(fn (\Filament\Schemas\Components\Utilities\Get $get): bool => 
-                        $isYayasanUser && 
-                        !in_array($get('role'), ['admin_yayasan', 'bendahara_yayasan'])
-                    ),
+                    ->live()
+                    
+                    ->default(fn () => $isYayasanUser ? null : $loggedInUser->school_id)
+                    ->disabled(fn () => !$isYayasanUser) // Nonaktifkan jika BUKAN Admin Yayasan
+                    
+                    ->visible(function (\Filament\Schemas\Components\Utilities\Get $get) use ($isYayasanUser): bool {
+                        if (!$isYayasanUser) return true; // Admin Sekolah WAJIB lihat (meski disabled)
 
-                // 2. Field Tersembunyi (Hanya untuk Admin Sekolah)
-                Hidden::make('school_id')
-                    ->default(auth()->user()->school_id)
-                    ->hidden($isYayasanUser), // Sembunyikan jika Admin Yayasan
+                        $selectedRoleIds = $get('roles');
+                        if (empty($selectedRoleIds)) return true;
+                        
+                        $roleNames = Role::whereIn('id', $selectedRoleIds)->pluck('name')->toArray();
+                        
+                        return empty(array_intersect(['admin_yayasan', 'bendahara_yayasan'], $roleNames));
+                    })
+                    ->required(function (\Filament\Schemas\Components\Utilities\Get $get) use ($isYayasanUser): bool {
+                        if (!$isYayasanUser) return true;
+                        $selectedRoleIds = $get('roles');
+                        if (empty($selectedRoleIds)) return true;
+                        $roleNames = Role::whereIn('id', $selectedRoleIds)->pluck('name')->toArray();
+                        return empty(array_intersect(['admin_yayasan', 'bendahara_yayasan'], $roleNames));
+                    }),
+
+                Select::make('department_id')
+                    ->label('Departemen / Bagian')
+                    ->relationship(
+                        name: 'department', // 1. Pakai nama relasi di Model User
+                        titleAttribute: 'name', // 2. Tampilkan kolom 'name'
+                        
+                        // 3. Modifikasi query agar dependent & tenant-aware
+                        modifyQueryUsing: function (Builder $query, \Filament\Schemas\Components\Utilities\Get $get) {
+                            $schoolId = $get('school_id'); // Ambil school_id
+                            $tenant = Filament::getTenant();
+
+                            // Query ini akan dijalankan saat load 'options'
+                            // DAN saat load 'saved value' di halaman edit
+                            return $query->where('foundation_id', $tenant?->id)
+                                          ->where('school_id', $schoolId);
+                        }
+                    )
+                    ->searchable()
+                    ->preload() // <-- Tambahkan ini untuk performa
+                    ->nullable(),
+
+                // HAPUS 'Hidden::make('school_id')' DARI SINI
             ]);
     }
 }

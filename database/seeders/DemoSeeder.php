@@ -8,10 +8,12 @@ use App\Models\FeeStructure;
 use App\Models\Foundation;
 use App\Models\School;
 use App\Models\SchoolClass;
-use App\Models\Student;    
+use App\Models\Student;
 use App\Models\User;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\Hash; 
+use Illuminate\Support\Facades\Hash;
+use Spatie\Permission\Models\Role;
+use Faker\Factory as Faker;
 
 class DemoSeeder extends Seeder
 {
@@ -20,151 +22,176 @@ class DemoSeeder extends Seeder
      */
     public function run(): void
     {
+        // Inisialisasi Faker untuk data Indonesia
+        $faker = Faker::create('id_ID');
+
+        // 0. Buat Role yang dibutuhkan
+        $this->command->info('Membuat Roles...');
+        $roleAdminYayasan = Role::firstOrCreate(['name' => 'Admin Yayasan', 'guard_name' => 'web']);
+        $roleAdminSekolah = Role::firstOrCreate(['name' => 'Admin Sekolah', 'guard_name' => 'web']);
+        $roleOrtu = Role::firstOrCreate(['name' => 'Orang Tua', 'guard_name' => 'web']);
+        Role::firstOrCreate(['name' => 'Kepala Bagian', 'guard_name' => 'web']);
+
         // 1. Buat 1 Yayasan (Tenant)
+        $this->command->info('Membuat Yayasan...');
         $foundation = Foundation::create([
-            'name' => 'Yayasan Demo ILMA',
-            'email' => 'kontak@yayasan-demo.com',
+            'name' => 'Yayasan Pesantren ILMA',
+            'email' => 'kontak@pesantren-ilma.com',
             'phone' => '08123456789'
         ]);
 
-        // 2. Buat 2 Sekolah (SD dan TK)
-        $schoolSD = School::create([
+        // 2. Buat User Admin Yayasan
+        $adminYayasan = User::create([
             'foundation_id' => $foundation->id,
-            'name' => 'SD Demo ILMA',
-            'level' => 'sd',
-            'headmaster' => 'Bpk. Budi'
-        ]);
-        
-        $schoolTK = School::create([
-            'foundation_id' => $foundation->id,
-            'name' => 'TK Demo ILMA',
-            'level' => 'tk',
-            'headmaster' => 'Ibu. Ani'
-        ]);
-
-        // 3. Buat User Admin
-        User::create([
-            'name' => 'Admin Yayasan Demo',
+            'name' => 'Admin Yayasan ILMA',
             'email' => 'admin@yayasan.com',
-            'password' => Hash::make('password'), 
-            'foundation_id' => $foundation->id,
-            'school_id' => null, 
-            'role' => 'admin_yayasan'
+            'password' => Hash::make('password'),
         ]);
+        $adminYayasan->assignRole($roleAdminYayasan);
 
-        User::create([
-            'name' => 'Admin SD Demo',
-            'email' => 'admin@sd.com',
-            'password' => Hash::make('password'), 
-            'foundation_id' => $foundation->id,
-            'school_id' => $schoolSD->id, 
-            'role' => 'admin_sekolah'
-        ]);
+        // 3. Buat Chart of Accounts (COA) Lengkap
+        $this->command->info('Membuat Chart of Accounts (COA)...');
+        // Aset (1000)
+        $accKas = Account::create(['foundation_id' => $foundation->id, 'code' => '1101', 'name' => 'Kas', 'type' => 'aktiva']);
+        $accBank = Account::create(['foundation_id' => $foundation->id, 'code' => '1102', 'name' => 'Bank BSI', 'type' => 'aktiva']);
+        Account::create(['foundation_id' => $foundation->id, 'code' => '1103', 'name' => 'Bank Xendit', 'type' => 'aktiva']);
+        $accPiutangSPP = Account::create(['foundation_id' => $foundation->id, 'code' => '1104', 'name' => 'Piutang SPP', 'type' => 'aktiva']);
+        Account::create(['foundation_id' => $foundation->id, 'code' => '1201', 'name' => 'Aset Tetap - Gedung', 'type' => 'aktiva']);
+        // Kewajiban (2000)
+        Account::create(['foundation_id' => $foundation->id, 'code' => '2101', 'name' => 'Utang Usaha', 'type' => 'kewajiban']);
+        // Ekuitas (3000)
+        Account::create(['foundation_id' => $foundation->id, 'code' => '3101', 'name' => 'Modal', 'type' => 'ekuitas']);
+        // Pendapatan (4000)
+        $accPendapatanSPP = Account::create(['foundation_id' => $foundation->id, 'code' => '4101', 'name' => 'Pendapatan SPP', 'type' => 'pendapatan']);
+        $accPendapatanGedung = Account::create(['foundation_id' => $foundation->id, 'code' => '4102', 'name' => 'Pendapatan Uang Gedung', 'type' => 'pendapatan']);
+        $accPendapatanMakan = Account::create(['foundation_id' => $foundation->id, 'code' => '4103', 'name' => 'Pendapatan Uang Makan', 'type' => 'pendapatan']);
+        $accPendapatanJemputan = Account::create(['foundation_id' => $foundation->id, 'code' => '4104', 'name' => 'Pendapatan Jemputan', 'type' => 'pendapatan']);
+        // Biaya (5000)
+        Account::create(['foundation_id' => $foundation->id, 'code' => '5101', 'name' => 'Biaya Gaji & Honor', 'type' => 'beban']);
+        Account::create(['foundation_id' => $foundation->id, 'code' => '5102', 'name' => 'Biaya Listrik, Air, Internet', 'type' => 'beban']);
+        Account::create(['foundation_id' => $foundation->id, 'code' => '5103', 'name' => 'Biaya Konsumsi', 'type' => 'beban']);
+        Account::create(['foundation_id' => $foundation->id, 'code' => '5104', 'name' => 'Biaya Transportasi', 'type' => 'beban']);
+        Account::create(['foundation_id' => $foundation->id, 'code' => '5105', 'name' => 'Biaya ATK', 'type' => 'beban']);
+
+
+        // 4. Buat 3 Sekolah (TK, SD, Pesantren)
+        $this->command->info('Membuat 3 Sekolah...');
+        $schoolTK = School::create(['foundation_id' => $foundation->id, 'name' => 'TK ILMA', 'level' => 'tk', 'headmaster' => 'Ibu Ani']);
+        $schoolSD = School::create(['foundation_id' => $foundation->id, 'name' => 'SD ILMA', 'level' => 'sd', 'headmaster' => 'Bpk. Budi']);
+        $schoolPondok = School::create(['foundation_id' => $foundation->id, 'name' => 'Pesantren ILMA', 'level' => 'pondok', 'headmaster' => 'Kyai Haji Fulan']);
+
+        // 5. Buat User Admin Sekolah
+        $adminTK = User::create(['foundation_id' => $foundation->id, 'school_id' => $schoolTK->id, 'name' => 'Admin TK', 'email' => 'admin@tk.com', 'password' => Hash::make('password')]);
+        $adminTK->assignRole($roleAdminSekolah);
+        $adminSD = User::create(['foundation_id' => $foundation->id, 'school_id' => $schoolSD->id, 'name' => 'Admin SD', 'email' => 'admin@sd.com', 'password' => Hash::make('password')]);
+        $adminSD->assignRole($roleAdminSekolah);
+        $adminPondok = User::create(['foundation_id' => $foundation->id, 'school_id' => $schoolPondok->id, 'name' => 'Admin Pesantren', 'email' => 'admin@pondok.com', 'password' => Hash::make('password')]);
+        $adminPondok->assignRole($roleAdminSekolah);
+
+        // 6. Buat Kategori Biaya (FeeCategory)
+        $this->command->info('Membuat Kategori Biaya...');
+        $catGedung = FeeCategory::create(['foundation_id' => $foundation->id, 'account_id' => $accPendapatanGedung->id, 'name' => 'Uang Gedung']);
+        $catSPP = FeeCategory::create(['foundation_id' => $foundation->id, 'account_id' => $accPendapatanSPP->id, 'name' => 'SPP']);
+        $catMakan = FeeCategory::create(['foundation_id' => $foundation->id, 'account_id' => $accPendapatanMakan->id, 'name' => 'Uang Makan']);
+        $catJemputan = FeeCategory::create(['foundation_id' => $foundation->id, 'account_id' => $accPendapatanJemputan->id, 'name' => 'Jemputan', 'is_optional' => true]);
+
+        // ==========================================================
+        // PERBAIKAN DI SINI (LANGKAH 7)
+        // ==========================================================
+        $this->command->info('Membuat Aturan Biaya (FeeStructure)...');
+        // TK (grade_level 0)
+        FeeStructure::create(['foundation_id' => $foundation->id, 'school_id' => $schoolTK->id, 'fee_category_id' => $catGedung->id, 'name' => $catGedung->name . ' TK', 'amount' => 1500000, 'grade_level' => 0]);
+        FeeStructure::create(['foundation_id' => $foundation->id, 'school_id' => $schoolTK->id, 'fee_category_id' => $catSPP->id, 'name' => $catSPP->name . ' TK', 'amount' => 200000, 'grade_level' => 0]);
         
-        User::create([
-            'name' => 'Admin TK Demo',
-            'email' => 'admin@tk.com',
-            'password' => Hash::make('password'), 
-            'foundation_id' => $foundation->id,
-            'school_id' => $schoolTK->id, 
-            'role' => 'admin_sekolah'
-        ]);
+        // SD (grade_level 1-6)
+        FeeStructure::create(['foundation_id' => $foundation->id, 'school_id' => $schoolSD->id, 'fee_category_id' => $catGedung->id, 'name' => $catGedung->name . ' SD (Kelas 1)', 'amount' => 2500000, 'grade_level' => 1]);
+        foreach (range(1, 6) as $grade) {
+            FeeStructure::create(['foundation_id' => $foundation->id, 'school_id' => $schoolSD->id, 'fee_category_id' => $catSPP->id, 'name' => $catSPP->name . " SD (Kelas $grade)", 'amount' => 350000, 'grade_level' => $grade]);
+            FeeStructure::create(['foundation_id' => $foundation->id, 'school_id' => $schoolSD->id, 'fee_category_id' => $catJemputan->id, 'name' => $catJemputan->name . " SD (Kelas $grade)", 'amount' => 150000, 'grade_level' => $grade]);
+        }
         
-        // --- (Data Akun, Kategori, Aturan Biaya biarkan sama) ---
-        // 4. Buat Akun (COA)
-        $akunKas = Account::create(['foundation_id' => $foundation->id,'code' => '1-100','name' => 'Kas / Bank','type' => 'aktiva','category' => 'Kas']);
-        $akunPendapatanSPP = Account::create(['foundation_id' => $foundation->id,'code' => '4-100','name' => 'Pendapatan SPP','type' => 'pendapatan']);
-        $akunPendapatanGedung = Account::create(['foundation_id' => $foundation->id,'code' => '4-200','name' => 'Pendapatan Uang Gedung','type' => 'pendapatan']);
-        $akunPendapatanEkskul = Account::create(['foundation_id' => $foundation->id,'code' => '4-300','name' => 'Pendapatan Ekskul','type' => 'pendapatan']);
+        // Pesantren (grade_level 7-12)
+        FeeStructure::create(['foundation_id' => $foundation->id, 'school_id' => $schoolPondok->id, 'fee_category_id' => $catGedung->id, 'name' => $catGedung->name . ' Pesantren (Kelas 7)', 'amount' => 5000000, 'grade_level' => 7]);
+        FeeStructure::create(['foundation_id' => $foundation->id, 'school_id' => $schoolPondok->id, 'fee_category_id' => $catGedung->id, 'name' => $catGedung->name . ' Pesantren (Kelas 10)', 'amount' => 5000000, 'grade_level' => 10]);
+        foreach (range(7, 12) as $grade) {
+            FeeStructure::create(['foundation_id' => $foundation->id, 'school_id' => $schoolPondok->id, 'fee_category_id' => $catSPP->id, 'name' => $catSPP->name . " Pesantren (Kelas $grade)", 'amount' => 450000, 'grade_level' => $grade]);
+            FeeStructure::create(['foundation_id' => $foundation->id, 'school_id' => $schoolPondok->id, 'fee_category_id' => $catMakan->id, 'name' => $catMakan->name . " Pesantren (Kelas $grade)", 'amount' => 350000, 'grade_level' => $grade]);
+        }
+        // ==========================================================
+        // AKHIR PERBAIKAN
+        // ==========================================================
 
-        // 5. Buat Kategori Biaya
-        $kategoriSPP = FeeCategory::create(['foundation_id' => $foundation->id,'name' => 'SPP Bulanan','account_id' => $akunPendapatanSPP->id]);
-        $kategoriGedung = FeeCategory::create(['foundation_id' => $foundation->id,'name' => 'Uang Gedung 2025','account_id' => $akunPendapatanGedung->id]);
-        $kategoriEkskul = FeeCategory::create(['foundation_id' => $foundation->id,'name' => 'Ekskul Renang','account_id' => $akunPendapatanEkskul->id]);
+        // 8. Buat Kelas dan Siswa (TOTAL 30 SISWA)
+        $this->command->info('Memulai pembuatan 30 Siswa & 30 Ortu (AKAN MEMICU API XENDIT)...');
+        $this->command->warn('Proses ini akan lambat karena menunggu API call Xendit...');
 
-        // 6. Buat Aturan Biaya (Fee Structures)
-        FeeStructure::create(['foundation_id' => $foundation->id,'school_id' => $schoolSD->id,'fee_category_id' => $kategoriSPP->id,'name' => 'SPP Bulanan SD','amount' => 500000,'billing_cycle' => 'monthly','is_active' => true]);
-        FeeStructure::create(['foundation_id' => $foundation->id,'school_id' => $schoolSD->id,'fee_category_id' => $kategoriGedung->id,'name' => 'Uang Gedung SD 2025','amount' => 3000000,'billing_cycle' => 'one_time','is_active' => true]);
-        FeeStructure::create(['foundation_id' => $foundation->id,'school_id' => $schoolTK->id,'fee_category_id' => $kategoriSPP->id,'name' => 'SPP Bulanan TK','amount' => 350000,'billing_cycle' => 'monthly','is_active' => true]);
-        FeeStructure::create(['foundation_id' => $foundation->id,'school_id' => $schoolSD->id,'fee_category_id' => $kategoriEkskul->id,'name' => 'Ekskul Renang SD','amount' => 150000,'billing_cycle' => 'monthly','is_active' => true]);
+        // A. Siswa TK (5 orang)
+        $kelasTKA = SchoolClass::create(['foundation_id' => $foundation->id, 'school_id' => $schoolTK->id, 'name' => 'TK A', 'grade_level' => 0]);
+        foreach (range(1, 5) as $i) {
+            $this->command->info("Membuat Siswa TK ke-$i...");
+            $ortu = User::create([
+                'foundation_id' => $foundation->id,
+                'name' => $faker->name(),
+                'email' => $faker->unique()->safeEmail(),
+                'password' => Hash::make('password')
+            ]);
+            $ortu->assignRole($roleOrtu);
 
+            Student::create(['foundation_id' => $foundation->id, 'school_id' => $schoolTK->id, 'class_id' => $kelasTKA->id, 'parent_id' => $ortu->id, 'nis' => "TK-A-$i", 'name' => $faker->name(str_contains($faker->title(), 'Mr.') ? 'male' : 'female'), 'status' => 'active']);
+        }
 
-        // --- ================================== ---
-        // ---        TAMBAHAN SEEDER BARU        ---
-        // --- ================================== ---
-
-        // 7. Buat User (Guru & Orang Tua)
-        $guruSD = User::create([
-            'name' => 'Budi Guru (Wali Kelas)',
-            'email' => 'guru@sd.com',
-            'password' => Hash::make('password'), 
-            'foundation_id' => $foundation->id,
-            'school_id' => $schoolSD->id, // Terikat ke SD
-            'role' => 'guru'
-        ]);
-
-        $ortuSiswaA = User::create([
-            'name' => 'Ayah Siswa A (SD)',
-            'email' => 'ortu@sd.com',
-            'password' => Hash::make('password'), 
-            'foundation_id' => $foundation->id,
-            'school_id' => $schoolSD->id, // Terikat ke SD
-            'role' => 'orangtua'
-        ]);
+        // B. Siswa SD (10 orang)
+        $kelasSD1 = SchoolClass::create(['foundation_id' => $foundation->id, 'school_id' => $schoolSD->id, 'name' => "Kelas 1 SD", 'grade_level' => 1]);
+        $kelasSD2 = SchoolClass::create(['foundation_id' => $foundation->id, 'school_id' => $schoolSD->id, 'name' => "Kelas 2 SD", 'grade_level' => 2]);
         
-        $ortuSiswaB = User::create([
-            'name' => 'Ibu Siswa B (TK)',
-            'email' => 'ortu@tk.com',
-            'password' => Hash::make('password'), 
-            'foundation_id' => $foundation->id,
-            'school_id' => $schoolTK->id, // Terikat ke TK
-            'role' => 'orangtua'
-        ]);
+        // 5 siswa di Kelas 1
+        foreach (range(1, 5) as $i) {
+            $this->command->info("Membuat Siswa SD ke-$i (Kelas 1)...");
+            $ortu = User::create(['foundation_id' => $foundation->id, 'name' => $faker->name(), 'email' => $faker->unique()->safeEmail(), 'password' => Hash::make('password')]);
+            $ortu->assignRole($roleOrtu);
+            $student = Student::create(['foundation_id' => $foundation->id, 'school_id' => $schoolSD->id, 'class_id' => $kelasSD1->id, 'parent_id' => $ortu->id, 'nis' => "SD-1-$i", 'name' => $faker->name(str_contains($faker->title(), 'Mr.') ? 'male' : 'female'), 'status' => 'active']);
+            if ($i <= 3) {
+                $student->optionalFees()->attach($catJemputan->id);
+            }
+        }
+        // 5 siswa di Kelas 2
+        foreach (range(6, 10) as $i) {
+            $this->command->info("Membuat Siswa SD ke-$i (Kelas 2)...");
+            $ortu = User::create(['foundation_id' => $foundation->id, 'name' => $faker->name(), 'email' => $faker->unique()->safeEmail(), 'password' => Hash::make('password')]);
+            $ortu->assignRole($roleOrtu);
+            $student = Student::create(['foundation_id' => $foundation->id, 'school_id' => $schoolSD->id, 'class_id' => $kelasSD2->id, 'parent_id' => $ortu->id, 'nis' => "SD-2-$i", 'name' => $faker->name(str_contains($faker->title(), 'Mr.') ? 'male' : 'female'), 'status' => 'active']);
+        }
 
-        // 8. Buat Kelas (SchoolClass)
-        $kelasSD1A = SchoolClass::create([
-            'foundation_id' => $foundation->id,
-            'school_id' => $schoolSD->id,
-            'name' => 'Kelas 1A - SD',
-            'homeroom_teacher_id' => $guruSD->id // <-- Relasi ke Guru
-        ]);
+        // C. Siswa Pesantren (15 orang)
+        $kelasP7 = SchoolClass::create(['foundation_id' => $foundation->id, 'school_id' => $schoolPondok->id, 'name' => "Kelas 7 (MTs)", 'grade_level' => 7]);
+        $kelasP8 = SchoolClass::create(['foundation_id' => $foundation->id, 'school_id' => $schoolPondok->id, 'name' => "Kelas 8 (MTs)", 'grade_level' => 8]);
+        $kelasP10 = SchoolClass::create(['foundation_id' => $foundation->id, 'school_id' => $schoolPondok->id, 'name' => "Kelas 10 (MA)", 'grade_level' => 10]);
 
-        $kelasTKA = SchoolClass::create([
-            'foundation_id' => $foundation->id,
-            'school_id' => $schoolTK->id,
-            'name' => 'Kelas A - TK',
-            'homeroom_teacher_id' => null // Belum ada wali kelas
-        ]);
+        // 5 santri di Kelas 7
+        foreach (range(1, 5) as $i) {
+            $this->command->info("Membuat Santri ke-$i (Kelas 7)...");
+            $ortu = User::create(['foundation_id' => $foundation->id, 'name' => $faker->name(), 'email' => $faker->unique()->safeEmail(), 'password' => Hash::make('password')]);
+            $ortu->assignRole($roleOrtu);
+            Student::create(['foundation_id' => $foundation->id, 'school_id' => $schoolPondok->id, 'class_id' => $kelasP7->id, 'parent_id' => $ortu->id, 'nis' => "P-7-$i", 'name' => $faker->name(str_contains($faker->title(), 'Mr.') ? 'male' : 'female'), 'status' => 'active']);
+        }
+        // 5 santri di Kelas 8
+        foreach (range(6, 10) as $i) {
+            $this->command->info("Membuat Santri ke-$i (Kelas 8)...");
+            $ortu = User::create(['foundation_id' => $foundation->id, 'name' => $faker->name(), 'email' => $faker->unique()->safeEmail(), 'password' => Hash::make('password')]);
+            $ortu->assignRole($roleOrtu);
+            Student::create(['foundation_id' => $foundation->id, 'school_id' => $schoolPondok->id, 'class_id' => $kelasP8->id, 'parent_id' => $ortu->id, 'nis' => "P-8-$i", 'name' => $faker->name(str_contains($faker->title(), 'Mr.') ? 'male' : 'female'), 'status' => 'active']);
+        }
+        // 5 santri di Kelas 10
+        foreach (range(11, 15) as $i) {
+            $this->command->info("Membuat Santri ke-$i (Kelas 10)...");
+            $ortu = User::create(['foundation_id' => $foundation->id, 'name' => $faker->name(), 'email' => $faker->unique()->safeEmail(), 'password' => Hash::make('password')]);
+            $ortu->assignRole($roleOrtu);
+            Student::create(['foundation_id' => $foundation->id, 'school_id' => $schoolPondok->id, 'class_id' => $kelasP10->id, 'parent_id' => $ortu->id, 'nis' => "P-10-$i", 'name' => $faker->name(str_contains($faker->title(), 'Mr.') ? 'male' : 'female'), 'status' => 'active']);
+        }
 
-        // 9. Buat Siswa (Student)
-        Student::create([
-            'foundation_id' => $foundation->id,
-            'school_id' => $schoolSD->id,
-            'class_id' => $kelasSD1A->id, // <-- Relasi ke Kelas 1A
-            'parent_id' => $ortuSiswaA->id, // <-- Relasi ke Ortu
-            'nis' => 'SD-001',
-            'name' => 'Siswa A (Anak Ayah A)',
-            'status' => 'active'
-        ]);
 
-        Student::create([
-            'foundation_id' => $foundation->id,
-            'school_id' => $schoolTK->id,
-            'class_id' => $kelasTKA->id, // <-- Relasi ke Kelas A
-            'parent_id' => $ortuSiswaB->id, // <-- Relasi ke Ortu
-            'nis' => 'TK-001',
-            'name' => 'Siswa B (Anak Ibu B)',
-            'status' => 'active'
-        ]);
-
-        Student::create([
-            'foundation_id' => $foundation->id,
-            'school_id' => $schoolSD->id,
-            'class_id' => $kelasSD1A->id, // <-- Relasi ke Kelas 1A
-            'parent_id' => null, // Belum ada ortu
-            'nis' => 'SD-002',
-            'name' => 'Siswa C (Belum ada ortu)',
-            'status' => 'active'
-        ]);
+        $this->command->info('===============================================================');
+        $this->command->info('DemoSeeder selesai. 1 Yayasan, 3 Sekolah, 30 Siswa, dan 30 Ortu telah dibuat.');
+        $this->command->info('30 API call ke Xendit (Test Mode) seharusnya sudah dieksekusi.');
     }
 }

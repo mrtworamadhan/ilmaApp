@@ -27,6 +27,10 @@ class SchoolResource extends Resource
     protected static ?string $navigationLabel = 'Manajemen Sekolah';
     protected static ?string $slug = 'sekolah';
     protected static ?string $recordTitleAttribute = 'name';
+    public static function canViewAny(): bool
+    {
+        return auth()->user()->hasRole('Admin Yayasan');
+    }
     public static function getEloquentQuery(): Builder
     {
         $query = parent::getEloquentQuery();

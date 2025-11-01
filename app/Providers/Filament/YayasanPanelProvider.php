@@ -2,23 +2,25 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Yayasan\Pages\Tenancy\CreateFoundation;
 use App\Models\Foundation;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
+use Filament\Http\Middleware\IdentifyTenant;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Pages\Dashboard;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
-use Filament\Widgets\AccountWidget;
-use Filament\Widgets\FilamentInfoWidget;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 
 class YayasanPanelProvider extends PanelProvider
 {
@@ -29,17 +31,31 @@ class YayasanPanelProvider extends PanelProvider
             ->id('yayasan')
             ->path('yayasan')
             ->login()
-            ->tenant(Foundation::class)
-            ->tenantRoutePrefix('yayasan')
+            ->tenant(
+                Foundation::class,
+                slugAttribute: 'id',
+                ownershipRelationship: 'foundation'
+            )
+            ->tenantMiddleware([
+                IdentifyTenant::class . ':yayasan',
+            ])
+            // ->tenantRegistration(CreateFoundation::class)
+            // ->tenantRoutePrefix('yayasan')
+            // // ✅ FILAMENT V4: Gunakan ignoresModels() sebagai method terpisah
+            // ->ignoresModels([
+            //     Role::class,
+            //     Permission::class,
+            // ])
+            // ->tenantRoutePrefix('yayasan')
             ->colors([
                 'primary' => Color::Amber,
             ])
-            ->discoverResources(in: app_path('Filament/Yayasan/Resources'), for: 'App\Filament\Yayasan\Resources')
-            ->discoverPages(in: app_path('Filament/Yayasan/Pages'), for: 'App\Filament\Yayasan\Pages')
+            ->discoverResources(in: app_path('Filament/Yayasan/Resources'), for: 'App\\Filament\\Yayasan\\Resources')
+            ->discoverPages(in: app_path('Filament/Yayasan/Pages'), for: 'App\\Filament\\Yayasan\\Pages')
             ->pages([
                 Dashboard::class,
             ])
-            ->discoverWidgets(in: app_path('Filament/Yayasan/Widgets'), for: 'App\Filament\Yayasan\Widgets')
+            ->discoverWidgets(in: app_path('Filament/Yayasan/Widgets'), for: 'App\\Filament\\Yayasan\\Widgets')
             ->widgets([
                 //
             ])

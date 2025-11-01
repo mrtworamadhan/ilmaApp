@@ -30,6 +30,10 @@ class UserResource extends Resource
     protected static ?string $recordTitleAttribute = 'name';
     protected static ?string $navigationLabel = 'Manajemen User';
     protected static ?string $slug = 'users';
+    public static function canViewAny(): bool
+    {
+        return auth()->user()->hasRole(['Admin Yayasan', 'Admin Sekolah']);
+    }
     public static function getEloquentQuery(): Builder
     {
         $query = parent::getEloquentQuery()

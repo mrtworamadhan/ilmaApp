@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Student extends Model
 {
@@ -36,10 +37,8 @@ class Student extends Model
         return $this->belongsTo(School::class);
     }
 
-    // Relasi ke Kelas
     public function schoolClass(): BelongsTo
     {
-        // Arahkan ke model SchoolClass, dengan foreign_key 'class_id'
         return $this->belongsTo(SchoolClass::class, 'class_id'); 
     }
 
@@ -51,5 +50,9 @@ class Student extends Model
     public function optionalFees(): BelongsToMany
     {
         return $this->belongsToMany(FeeStructure::class, 'student_optional_fees');
+    }
+    public function savingAccount(): HasOne
+    {
+        return $this->hasOne(SavingAccount::class);
     }
 }

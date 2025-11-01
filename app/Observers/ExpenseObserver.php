@@ -3,6 +3,7 @@
 namespace App\Observers;
 
 use App\Models\Expense;
+use App\Models\DisbursementRequest;
 use App\Models\Journal; // <-- Import Journal
 use App\Models\JournalEntry; // <-- Import JournalEntry
 use Illuminate\Support\Facades\Log;
@@ -14,6 +15,20 @@ class ExpenseObserver
      */
     public function created(Expense $expense): void
     {
+        if ($expense->disbursement_request_id) {
+            try {
+                $disbursement = DisbursementRequest::find($expense->disbursement_request_id);
+
+                if ($disbursement) {
+                    $disbursement->update([
+                        'status' => 'DISBURSED', // <-- Update status
+                        'realization_amount' => $expense->amount, // <-- Catat jumlah realisasi
+                    ]);
+                }
+            } catch (\Exception $e) {
+                Log::error('Gagal update status DisbursementRequest: ' . $e->getMessage());
+            }
+        }
         try {
             // 1. Buat Jurnal Induk
             $journal = $expense->journal()->create([

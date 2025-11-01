@@ -26,21 +26,23 @@ use UnitEnum;
 // 3. Implement HasForms dan HasTable
 class LaporanBukuBesar extends Page implements HasForms, HasTable
 {
-    // 4. Gunakan Trait
     use InteractsWithForms, InteractsWithTable;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
     protected static ?string $navigationLabel = 'Laporan Buku Besar';
     protected string $view = 'filament.yayasan.pages.laporan-buku-besar';
     protected static string | UnitEnum | null $navigationGroup  = 'Laporan';
-    protected static ?int $navigationSort = 2;
+    protected static ?int $navigationSort = 3;
     protected static ?string $slug = 'laporan/buku-besar';
 
-    // --- 5. Properti untuk menampung filter ---
     public ?int $selectedAccount = null;
     public ?int $selectedSchool = null;
     public ?string $startDate = null;
     public ?string $endDate = null;
+    public static function canAccess(): bool
+    {
+        return auth()->user()->hasRole(['Admin Yayasan', 'Admin Sekolah']);
+    }
 
     public function mount(): void
     {

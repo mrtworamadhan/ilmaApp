@@ -28,6 +28,10 @@ class PaymentResource extends Resource
     protected static ?string $slug = 'pembayaran';
     protected static string | UnitEnum | null $navigationGroup  = 'Manajemen Keuangan';
     protected static ?int $navigationSort = 4;
+    public static function canViewAny(): bool
+    {
+        return auth()->user()->hasRole(['Admin Yayasan', 'Admin Sekolah']);
+    }
 
     public static function getEloquentQuery(): Builder
     {

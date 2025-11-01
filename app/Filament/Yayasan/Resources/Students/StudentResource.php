@@ -30,23 +30,23 @@ class StudentResource extends Resource
     protected static ?string $slug = 'siswa';
     protected static string | UnitEnum | null $navigationGroup  = 'Manajemen Siswa';
     protected static ?int $navigationSort = 2;
+
+    public static function canViewAny(): bool
+    {
+        return auth()->user()->hasRole(['Admin Yayasan', 'Admin Sekolah']);
+    }
     
     public static function getEloquentQuery(): Builder
     {
-        // 1. Ambil query dasar (sudah di-scope ke Tenant/Yayasan)
         $query = parent::getEloquentQuery()
                     ->where('foundation_id', Filament::getTenant()->id);
 
-        // 2. Cek apakah user ini level Sekolah?
         $userSchoolId = auth()->user()->school_id;
         
         if ($userSchoolId) {
-            // 3. Jika ya, paksa query HANYA tampilkan siswa
-            // dari sekolah milik user tsb.
             $query->where('school_id', $userSchoolId);
         }
 
-        // 4. Jika tidak (level Yayasan), kembalikan query langkah 1
         return $query;
     }
 

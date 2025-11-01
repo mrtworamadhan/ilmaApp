@@ -40,10 +40,11 @@ class PaymentObserver
             // Untuk sekarang, kita asumsikan semua masuk ke akun Kas/Bank pertama yg ditemukan
             // Idealnya, ini harus ditentukan berdasarkan metode bayar atau sekolah
             $akunKasBank = Account::where('foundation_id', $payment->foundation_id)
-                                ->where('type', 'aktiva') //
-                                ->whereIn('category', ['Kas', 'Bank']) // Cari Kas atau Bank
-                                ->orderBy('id', 'asc') // Ambil yg pertama dibuat
-                                ->first();
+                     ->where('type', 'aktiva') 
+                     // GANTI 'category' MENJADI 'code'
+                     ->whereIn('code', ['1101', '1102', '1103']) // 1101=Kas, 1102=Bank BSI, 1103=Bank Xendit
+                     ->orderBy('id', 'asc') // Ambil yg pertama dibuat (Kas)
+                     ->first();
 
             if (!$akunKasBank) {
                 Log::error('Akun Kas/Bank default tidak ditemukan untuk Foundation ID: ' . $payment->foundation_id . '. Jurnal GAGAL dibuat untuk Payment ID: ' . $payment->id);

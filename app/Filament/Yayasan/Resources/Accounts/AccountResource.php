@@ -28,6 +28,10 @@ class AccountResource extends Resource
     protected static ?string $slug = 'akun-keuangan';
     protected static string | UnitEnum | null $navigationGroup  = 'Manajemen Keuangan';
     protected static ?int $navigationSort = 1; // Urutan pertama di grup
+    public static function canViewAny(): bool
+    {
+        return auth()->user()->hasRole(['Admin Yayasan', 'Admin Sekolah']);
+    }
     public static function getEloquentQuery(): Builder
     {
         // Otomatis filter data berdasarkan Yayasan yang login

@@ -24,6 +24,8 @@ return new class extends Migration
             $table->foreignId('account_id')
                   ->constrained('accounts')
                   ->cascadeOnDelete();
+                  
+            $table->boolean('is_optional')->default(false);
 
             $table->timestamps();
         });

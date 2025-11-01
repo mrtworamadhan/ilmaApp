@@ -3,22 +3,35 @@
 namespace App\Providers;
 
 use App\Models\Expense;
-use App\Models\Payment; // <-- 1. Import Payment
+use App\Models\Payment;
 use App\Models\Student;
+use App\Models\Budget;
+use App\Models\DisbursementRequest;
+use App\Policies\BudgetPolicy;
+use App\Policies\DisbursementRequestPolicy;
+use App\Observers\DisbursementRequestObserver;
 use App\Observers\ExpenseObserver;
 use App\Observers\PaymentObserver;
 use App\Observers\StudentObserver;
+use App\Models\SavingTransaction; // <-- 1. IMPORT MODEL BARU
+use App\Observers\SavingTransactionObserver;
 use Illuminate\Support\ServiceProvider;
 use Xendit\Configuration;
 use Xendit\PaymentMethod\VirtualAccount;
+use Illuminate\Support\Facades\Gate; // <-- 1. TAMBAHKAN IMPORT INI
 
 class AppServiceProvider extends ServiceProvider
 {
+    /**
+     * HAPUS PROPERTI $policies DARI SINI
+     */
+
     /**
      * Register any application services.
      */
     public function register(): void
     {
+        
         $this->app->singleton(VirtualAccount::class, function ($app) {
             // 1. Buat object konfigurasi
             $config = Configuration::getDefaultConfiguration();
@@ -36,9 +49,15 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // 2. DAFTARKAN POLICIES SECARA MANUAL DI SINI
+        Gate::policy(Budget::class, BudgetPolicy::class);
+        Gate::policy(DisbursementRequest::class, DisbursementRequestPolicy::class);
+
+        // 3. OBSERVER ANDA SUDAH BENAR DI SINI
         Payment::observe(PaymentObserver::class);
         Expense::observe(ExpenseObserver::class);
         Student::observe(StudentObserver::class);
-
+        DisbursementRequest::observe(DisbursementRequestObserver::class);
+        SavingTransaction::observe(SavingTransactionObserver::class);
     }
 }
