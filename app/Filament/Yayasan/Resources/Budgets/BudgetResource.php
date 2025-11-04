@@ -2,6 +2,7 @@
 
 namespace App\Filament\Yayasan\Resources\Budgets;
 
+use App\Filament\Traits\HasModuleAccess;
 use App\Filament\Yayasan\Resources\Budgets\Pages\CreateBudget;
 use App\Filament\Yayasan\Resources\Budgets\Pages\EditBudget;
 use App\Filament\Yayasan\Resources\Budgets\Pages\ListBudgets;
@@ -19,6 +20,13 @@ use Filament\Tables\Table;
 
 class BudgetResource extends Resource
 {
+    use HasModuleAccess;
+    protected static string $requiredModule = 'finance';
+    public static function canViewAny(): bool
+    {
+        return static::canAccessWithRolesAndModule(['Admin Yayasan', 'Admin Sekolah']);
+    }
+
     protected static ?string $model = Budget::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBanknotes;

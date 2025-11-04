@@ -2,6 +2,7 @@
 
 namespace App\Filament\Yayasan\Pages;
 
+use App\Filament\Traits\HasModuleAccess;
 use App\Models\Budget;
 use App\Models\BudgetItem;
 use App\Models\Department;
@@ -24,8 +25,12 @@ use UnitEnum;
 
 class LaporanRealisasiAnggaran extends Page implements HasForms, HasTable
 {
-    use InteractsWithForms;
-    use InteractsWithTable;
+    use InteractsWithForms, InteractsWithTable, HasModuleAccess;
+    protected static string $requiredModule = 'finance';
+    public static function canViewAny(): bool
+    {
+        return static::canAccessWithRolesAndModule(['Admin Yayasan', 'Admin Sekolah']);
+    }
 
     protected string $view = 'filament.yayasan.pages.laporan-realisasi-anggaran';
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
@@ -41,11 +46,7 @@ class LaporanRealisasiAnggaran extends Page implements HasForms, HasTable
             'academic_year' => Budget::where('status', 'APPROVED')->latest('academic_year')->value('academic_year'),
         ]);
     }
-
-    public static function canAccess(): bool
-    {
-        return auth()->user()->hasRole(['Admin Yayasan', 'Admin Sekolah']);
-    }
+    
     public function form(Schema $form): Schema
     {
         return $form

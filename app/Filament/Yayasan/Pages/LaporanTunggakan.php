@@ -2,6 +2,7 @@
 
 namespace App\Filament\Yayasan\Pages;
 
+use App\Filament\Traits\HasModuleAccess;
 use App\Models\Bill;
 use App\Models\School;
 use App\Models\SchoolClass;
@@ -26,7 +27,12 @@ use UnitEnum;
 
 class LaporanTunggakan extends Page implements HasForms, HasTable
 {
-    use InteractsWithForms, InteractsWithTable;
+    use InteractsWithForms, InteractsWithTable, HasModuleAccess;
+    protected static string $requiredModule = 'finance';
+    public static function canViewAny(): bool
+    {
+        return static::canAccessWithRolesAndModule(['Admin Yayasan', 'Admin Sekolah']);
+    }
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
     protected static string | UnitEnum | null $navigationGroup  = 'Laporan';
@@ -37,18 +43,12 @@ class LaporanTunggakan extends Page implements HasForms, HasTable
 
     // Hapus property individual, gunakan array filters saja
     public array $filters = [];
-    public static function canAccess(): bool
-    {
-        // Ini sudah benar
-        return auth()->user()->hasRole(['Admin Yayasan', 'Admin Sekolah']);
-    }
 
     public function mount(): void
     {
         $userSchoolId = auth()->user()->school_id;
         $isYayasanUser = auth()->user()->school_id === null;
         
-        // Inisialisasi filters dengan nilai default
         $this->filters = [
             'selectedSchool' => $isYayasanUser ? null : $userSchoolId,
             'selectedClass' => null,
@@ -56,14 +56,13 @@ class LaporanTunggakan extends Page implements HasForms, HasTable
         ];
     }
 
-    // --- Definisi Form Filter ---
     public function filterForm(Schema $form): Schema
     {
         $isYayasanUser = auth()->user()->school_id === null;
         $userSchoolId = auth()->user()->school_id;
 
         return $form
-            ->statePath('filters') // Simpan state di property $filters
+            ->statePath('filters')
             ->schema([
                 Select::make('selectedSchool')
                     ->label('Filter Sekolah')

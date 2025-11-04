@@ -2,6 +2,7 @@
 
 namespace App\Filament\Yayasan\Resources\Journals;
 
+use App\Filament\Traits\HasModuleAccess;
 use App\Filament\Yayasan\Resources\Journals\Pages\CreateJournal;
 use App\Filament\Yayasan\Resources\Journals\Pages\EditJournal;
 use App\Filament\Yayasan\Resources\Journals\Pages\ListJournals;
@@ -19,6 +20,13 @@ use Illuminate\Database\Eloquent\Builder;
 
 class JournalResource extends Resource
 {
+    use HasModuleAccess;
+    protected static string $requiredModule = 'finance';
+    public static function canViewAny(): bool
+    {
+        return static::canAccessWithRolesAndModule(['Admin Yayasan', 'Admin Sekolah']);
+    }
+
     protected static ?string $model = Journal::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
@@ -28,10 +36,6 @@ class JournalResource extends Resource
     protected static ?int $navigationSort = 2;
 
     protected static ?string $recordTitleAttribute = 'name';
-    public static function canViewAny(): bool
-    {
-        return auth()->user()->hasRole(['Admin Yayasan', 'Admin Sekolah']);
-    }
 
     public static function getEloquentQuery(): Builder
     {

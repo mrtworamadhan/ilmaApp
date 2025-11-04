@@ -2,6 +2,7 @@
 
 namespace App\Filament\Yayasan\Resources\Expenses;
 
+use App\Filament\Traits\HasModuleAccess;
 use App\Filament\Yayasan\Resources\Expenses\Pages\CreateExpense;
 use App\Filament\Yayasan\Resources\Expenses\Pages\EditExpense;
 use App\Filament\Yayasan\Resources\Expenses\Pages\ListExpenses;
@@ -19,6 +20,13 @@ use Illuminate\Database\Eloquent\Builder;
 
 class ExpenseResource extends Resource
 {
+    use HasModuleAccess;
+    protected static string $requiredModule = 'finance';
+    public static function canViewAny(): bool
+    {
+        return static::canAccessWithRolesAndModule(['Admin Yayasan', 'Admin Sekolah']);
+    }
+
     protected static ?string $model = Expense::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
@@ -28,10 +36,6 @@ class ExpenseResource extends Resource
     protected static ?string $slug = 'pengeluaran';
     protected static string | UnitEnum | null $navigationGroup  = 'Manajemen Keuangan';
     protected static ?int $navigationSort = 3;
-    public static function canViewAny(): bool
-    {
-        return auth()->user()->hasRole(['Admin Yayasan', 'Admin Sekolah']);
-    }
 
     public static function getEloquentQuery(): Builder
     {

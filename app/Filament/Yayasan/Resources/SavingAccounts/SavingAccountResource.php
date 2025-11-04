@@ -2,6 +2,7 @@
 
 namespace App\Filament\Yayasan\Resources\SavingAccounts;
 
+use App\Filament\Traits\HasModuleAccess;
 use App\Filament\Yayasan\Resources\SavingAccounts\Pages\CreateSavingAccount;
 use App\Filament\Yayasan\Resources\SavingAccounts\Pages\EditSavingAccount;
 use App\Filament\Yayasan\Resources\SavingAccounts\Pages\ListSavingAccounts;
@@ -17,6 +18,12 @@ use Filament\Tables\Table;
 
 class SavingAccountResource extends Resource
 {
+    use HasModuleAccess;
+    protected static string $requiredModule = 'savings';
+    public static function canViewAny(): bool
+    {
+        return static::canAccessWithRolesAndModule(['Admin Yayasan', 'Admin Sekolah']);
+    }
     protected static ?string $model = SavingAccount::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBookOpen;

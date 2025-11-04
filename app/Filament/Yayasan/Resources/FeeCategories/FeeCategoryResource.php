@@ -2,6 +2,7 @@
 
 namespace App\Filament\Yayasan\Resources\FeeCategories;
 
+use App\Filament\Traits\HasModuleAccess;
 use App\Filament\Yayasan\Resources\FeeCategories\Pages\CreateFeeCategory;
 use App\Filament\Yayasan\Resources\FeeCategories\Pages\EditFeeCategory;
 use App\Filament\Yayasan\Resources\FeeCategories\Pages\ListFeeCategories;
@@ -19,6 +20,13 @@ use Illuminate\Database\Eloquent\Builder;
 
 class FeeCategoryResource extends Resource
 {
+    use HasModuleAccess;
+    protected static string $requiredModule = 'finance';
+    public static function canViewAny(): bool
+    {
+        return static::canAccessWithRolesAndModule(['Admin Yayasan', 'Admin Sekolah']);
+    }
+
     protected static ?string $model = FeeCategory::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::Tag;
@@ -28,10 +36,7 @@ class FeeCategoryResource extends Resource
     protected static ?string $slug = 'kategori-biaya';
     protected static string | UnitEnum | null $navigationGroup  = 'Manajemen Biaya';
     protected static ?int $navigationSort = 2;
-    public static function canViewAny(): bool
-    {
-        return auth()->user()->hasRole(['Admin Yayasan', 'Admin Sekolah']);
-    }
+
     public static function getEloquentQuery(): Builder
     {
         // Otomatis filter data berdasarkan Yayasan yang login

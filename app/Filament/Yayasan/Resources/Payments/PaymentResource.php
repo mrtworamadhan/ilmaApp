@@ -2,6 +2,7 @@
 
 namespace App\Filament\Yayasan\Resources\Payments;
 
+use App\Filament\Traits\HasModuleAccess;
 use App\Filament\Yayasan\Resources\Payments\Pages\CreatePayment;
 use App\Filament\Yayasan\Resources\Payments\Pages\EditPayment;
 use App\Filament\Yayasan\Resources\Payments\Pages\ListPayments;
@@ -19,6 +20,12 @@ use Illuminate\Database\Eloquent\Builder;
 
 class PaymentResource extends Resource
 {
+    use HasModuleAccess;
+    protected static string $requiredModule = 'finance';
+    public static function canViewAny(): bool
+    {
+        return static::canAccessWithRolesAndModule(['Admin Yayasan', 'Admin Sekolah']);
+    }
     protected static ?string $model = Payment::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBanknotes;
@@ -28,10 +35,6 @@ class PaymentResource extends Resource
     protected static ?string $slug = 'pembayaran';
     protected static string | UnitEnum | null $navigationGroup  = 'Manajemen Keuangan';
     protected static ?int $navigationSort = 4;
-    public static function canViewAny(): bool
-    {
-        return auth()->user()->hasRole(['Admin Yayasan', 'Admin Sekolah']);
-    }
 
     public static function getEloquentQuery(): Builder
     {

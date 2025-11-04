@@ -2,6 +2,7 @@
 
 namespace App\Filament\Yayasan\Resources\Bills;
 
+use App\Filament\Traits\HasModuleAccess;
 use App\Filament\Yayasan\Resources\Bills\Pages\CreateBill;
 use App\Filament\Yayasan\Resources\Bills\Pages\EditBill;
 use App\Filament\Yayasan\Resources\Bills\Pages\ListBills;
@@ -19,6 +20,18 @@ use Illuminate\Database\Eloquent\Builder;
 
 class BillResource extends Resource
 {
+    use HasModuleAccess;
+    protected static string $requiredModule = 'finance';
+    public static function canViewAny(): bool
+    {
+        return static::canAccessWithRolesAndModule(['Admin Yayasan', 'Admin Sekolah']);
+    }
+
+    public static function getNavigationGroup(): ?string
+    {
+        return 'Manajemen Biaya';
+    }
+    
     protected static ?string $model = Bill::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::DocumentText;
@@ -28,26 +41,18 @@ class BillResource extends Resource
     protected static ?string $slug = 'tagihan';
     protected static string | UnitEnum | null $navigationGroup  = 'Manajemen Biaya';
     protected static ?int $navigationSort = 3;
-    public static function canViewAny(): bool
-    {
-        return auth()->user()->hasRole(['Admin Yayasan', 'Admin Sekolah']);
-    }
+    
     public static function getEloquentQuery(): Builder
     {
-        // 1. Ambil query dasar (sudah di-scope ke Tenant/Yayasan)
         $query = parent::getEloquentQuery()
                     ->where('foundation_id', Filament::getTenant()->id);
 
-        // 2. Cek apakah user ini level Sekolah?
         $userSchoolId = auth()->user()->school_id;
         
         if ($userSchoolId) {
-            // 3. Jika ya, paksa query HANYA tampilkan tagihan
-            // dari sekolah milik user tsb.
             $query->where('school_id', $userSchoolId);
         }
 
-        // 4. Jika tidak (level Yayasan), kembalikan query langkah 1
         return $query;
     }
 

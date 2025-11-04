@@ -2,6 +2,7 @@
 
 namespace App\Filament\Yayasan\Pages;
 
+use App\Filament\Traits\HasModuleAccess;
 use App\Models\Account;
 use App\Models\JournalEntry;
 use App\Models\School;
@@ -23,8 +24,12 @@ use UnitEnum;
 
 class LaporanNeraca extends Page implements HasForms
 {
-    use InteractsWithForms;
-
+    use InteractsWithForms, HasModuleAccess;
+    protected static string $requiredModule = 'finance';
+    public static function canViewAny(): bool
+    {
+        return static::canAccessWithRolesAndModule(['Admin Yayasan', 'Admin Sekolah']);
+    }
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
     protected static ?string $navigationLabel = 'Laporan Neraca';
     protected string $view = 'filament.yayasan.pages.laporan-neraca';
@@ -48,12 +53,6 @@ class LaporanNeraca extends Page implements HasForms
     public $totalAktivaTermasukPiutang = 0;
     public $labaDitangguhkan = 0;
     public $totalEkuitasTermasukLabaDitangguhkan = 0;
-    public static function canAccess(): bool
-    {
-        // Ini sudah benar
-        return auth()->user()->hasRole(['Admin Yayasan', 'Admin Sekolah']);
-    }
-
     public function mount(): void
     {
         $this->startDate = now()->startOfYear()->format('Y-m-d');

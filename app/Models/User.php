@@ -31,6 +31,7 @@ class User extends Authenticatable implements HasTenants
         'foundation_id',
         'school_id',
         'department_id',
+        'is_platform_admin',
         // 'role',
     ];
 

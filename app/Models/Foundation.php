@@ -17,6 +17,11 @@ class Foundation extends Model
         'phone',
         'email',
         'npwp',
+        'enabled_modules',
+    ];
+
+    protected $casts = [
+        'enabled_modules' => 'array',
     ];
 
     /**
@@ -34,5 +39,10 @@ class Foundation extends Model
     public function users(): HasMany
     {
         return $this->hasMany(User::class);
+    }
+
+    public function hasModule(string $module): bool
+    {
+        return in_array($module, $this->enabled_modules ?? []);
     }
 }

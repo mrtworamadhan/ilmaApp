@@ -2,6 +2,7 @@
 
 namespace App\Filament\Yayasan\Resources\DisbursementRequests;
 
+use App\Filament\Traits\HasModuleAccess;
 use App\Filament\Yayasan\Resources\DisbursementRequests\Pages\CreateDisbursementRequest;
 use App\Filament\Yayasan\Resources\DisbursementRequests\Pages\EditDisbursementRequest;
 use App\Filament\Yayasan\Resources\DisbursementRequests\Pages\ListDisbursementRequests;
@@ -20,6 +21,13 @@ use Illuminate\Database\Eloquent\Builder;
 
 class DisbursementRequestResource extends Resource
 {
+    use HasModuleAccess;
+    protected static string $requiredModule = 'finance';
+    public static function canViewAny(): bool
+    {
+        return static::canAccessWithRolesAndModule(['Admin Yayasan', 'Admin Sekolah']);
+    }
+    
     protected static ?string $model = DisbursementRequest::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedArchiveBoxArrowDown;

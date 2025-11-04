@@ -3,6 +3,7 @@
 namespace App\Filament\Yayasan\Widgets;
 
 use App\Models\JournalEntry;
+use App\Models\Foundation;
 use Carbon\Carbon;
 use Filament\Facades\Filament;
 use Filament\Widgets\ChartWidget;
@@ -12,17 +13,15 @@ use Illuminate\Support\Facades\DB;
 
 class PemasukanPengeluaranChart extends ChartWidget
 {
+    public static function canView(): bool
+    {
+        $tenant = Filament::getTenant();
+        // Cek apakah tenant ada DAN modul 'finance' aktif
+        return $tenant instanceof Foundation && $tenant->hasModule('finance');
+    }
     protected ?string $heading = 'Grafik Pemasukan vs Pengeluaran (6 Bulan Terakhir)';
     protected static ?int $sort = 2;
     protected int | string | array $columnSpan = 'full';
-
-    /**
-     * Tampilkan widget ini HANYA untuk Admin Yayasan dan Admin Sekolah.
-     */
-    public static function canView(): bool
-    {
-        return auth()->user()?->hasRole(['Admin Yayasan', 'Admin Sekolah']);
-    }
 
     protected function getData(): array
     {

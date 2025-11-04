@@ -1,0 +1,29 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::table('foundations', function (Blueprint $table) {
+            // Tipe JSON untuk menyimpan array modul yg aktif, misal: ["finance", "attendance"]
+            $table->json('enabled_modules')->nullable()->after('npwp');
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::table('foundations', function (Blueprint $table) {
+            $table->dropColumn('enabled_modules');
+        });
+    }
+};

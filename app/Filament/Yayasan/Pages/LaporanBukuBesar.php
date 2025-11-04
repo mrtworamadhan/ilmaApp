@@ -2,6 +2,7 @@
 
 namespace App\Filament\Yayasan\Pages;
 
+use App\Filament\Traits\HasModuleAccess;
 use App\Models\Account;
 use App\Models\JournalEntry;
 use App\Models\School;
@@ -26,7 +27,12 @@ use UnitEnum;
 // 3. Implement HasForms dan HasTable
 class LaporanBukuBesar extends Page implements HasForms, HasTable
 {
-    use InteractsWithForms, InteractsWithTable;
+    use InteractsWithForms, InteractsWithTable, HasModuleAccess;
+    protected static string $requiredModule = 'finance';
+    public static function canViewAny(): bool
+    {
+        return static::canAccessWithRolesAndModule(['Admin Yayasan', 'Admin Sekolah']);
+    }
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
     protected static ?string $navigationLabel = 'Laporan Buku Besar';
@@ -39,11 +45,7 @@ class LaporanBukuBesar extends Page implements HasForms, HasTable
     public ?int $selectedSchool = null;
     public ?string $startDate = null;
     public ?string $endDate = null;
-    public static function canAccess(): bool
-    {
-        return auth()->user()->hasRole(['Admin Yayasan', 'Admin Sekolah']);
-    }
-
+    
     public function mount(): void
     {
         // Set tanggal default (bulan ini)

@@ -7,6 +7,7 @@ use App\Models\BudgetItem;
 use App\Models\Department;
 use App\Models\JournalEntry;
 use Filament\Facades\Filament;
+use App\Models\Foundation;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 use Illuminate\Database\Eloquent\Builder;
@@ -24,7 +25,8 @@ class DashboardFinancialOverview extends BaseWidget
      */
     public static function canView(): bool
     {
-        return auth()->user()?->hasRole(['Admin Yayasan', 'Admin Sekolah']);
+        $tenant = Filament::getTenant();
+        return $tenant instanceof Foundation && $tenant->hasModule('finance');
     }
 
     protected function getStats(): array

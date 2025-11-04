@@ -29,6 +29,11 @@ class ExpenseObserver
                 Log::error('Gagal update status DisbursementRequest: ' . $e->getMessage());
             }
         }
+        if (! $expense->foundation->hasModule('finance')) {
+            Log::info('Modul Finance nonaktif. Jurnal DIBATALKAN untuk Expense ID: ' . $expense->id);
+            return; // STOP, JANGAN BUAT JURNAL
+        }
+        Log::info('Modul Finance aktif. Memproses Jurnal untuk Expense ID: ' . $expense->id);
         try {
             // 1. Buat Jurnal Induk
             $journal = $expense->journal()->create([

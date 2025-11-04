@@ -1,0 +1,19 @@
+<?php
+
+namespace App\Filament\Admin\Resources\Foundations\Pages;
+
+use App\Filament\Admin\Resources\Foundations\FoundationResource;
+use Filament\Actions\DeleteAction;
+use Filament\Resources\Pages\EditRecord;
+
+class EditFoundation extends EditRecord
+{
+    protected static string $resource = FoundationResource::class;
+
+    protected function getHeaderActions(): array
+    {
+        return [
+            DeleteAction::make(),
+        ];
+    }
+}

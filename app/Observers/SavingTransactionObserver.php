@@ -31,67 +31,66 @@ class SavingTransactionObserver
 
                 
                 // 2. BUAT JURNAL (VERSI DOUBLE ENTRY YANG BENAR)
-
-                // Ambil akun COA
-                $akunKasTabungan = Account::where('foundation_id', $transaction->foundation_id)
+                if ($transaction->foundation->hasModule('finance')) {
+                    $akunKasTabungan = Account::where('foundation_id', $transaction->foundation_id)
                                 ->where('code', '1105') // <-- GANTI DARI 1101 ke 1105
                                 ->firstOrFail();
                                 
-                $akunUtangTabungan = Account::where('foundation_id', $transaction->foundation_id)
-                                ->where('code', '2102') // Asumsi 2102 = Utang Tabungan Siswa
-                                ->firstOrFail();
+                    $akunUtangTabungan = Account::where('foundation_id', $transaction->foundation_id)
+                                    ->where('code', '2102') // Asumsi 2102 = Utang Tabungan Siswa
+                                    ->firstOrFail();
 
-                $debitAccountId = null;
-                $creditAccountId = null;
-                
-                if ($transaction->type === 'CREDIT') {
-                    // SETOR: Kas (Debit), Utang Tabungan (Kredit)
-                    $debitAccountId = $akunKasTabungan->id;
-                    $creditAccountId = $akunUtangTabungan->id;
-                } elseif ($transaction->type === 'DEBIT') {
-                    // TARIK: Utang Tabungan (Debit), Kas (Kredit)
-                    $debitAccountId = $akunUtangTabungan->id;
-                    $creditAccountId = $akunKasTabungan->id;
+                    $debitAccountId = null;
+                    $creditAccountId = null;
+                    
+                    if ($transaction->type === 'CREDIT') {
+                        // SETOR: Kas (Debit), Utang Tabungan (Kredit)
+                        $debitAccountId = $akunKasTabungan->id;
+                        $creditAccountId = $akunUtangTabungan->id;
+                    } elseif ($transaction->type === 'DEBIT') {
+                        // TARIK: Utang Tabungan (Debit), Kas (Kredit)
+                        $debitAccountId = $akunUtangTabungan->id;
+                        $creditAccountId = $akunKasTabungan->id;
+                    }
+
+                    // ===============================================
+                    // PERBAIKAN LOGIKA JURNAL
+                    // ===============================================
+
+                    // Langkah A: Buat Jurnal HEADER
+                    $journal = Journal::create([
+                        'foundation_id' => $transaction->foundation_id,
+                        'school_id' => $savingAccount->school_id, // <-- FIX 1: Ambil school_id dari rekening
+                        'date' => $transaction->created_at->toDateString(),
+                        'description' => $transaction->description,
+                        'referenceable_id' => $transaction->id,
+                        'referenceable_type' => SavingTransaction::class,
+                        'created_by' => $transaction->user_id,
+                    ]);
+
+                    // Langkah B: Buat Jurnal ENTRIES (Detail Debit & Kredit)
+                    
+                    // Entry Sisi DEBIT
+                    $journal->entries()->create([
+                        'account_id' => $debitAccountId,
+                        'type' => 'debit', // <-- Sesuai LaporanNeraca.php Anda
+                        'amount' => $transaction->amount,
+                    ]);
+
+                    // Entry Sisi KREDIT
+                    $journal->entries()->create([
+                        'account_id' => $creditAccountId,
+                        'type' => 'kredit', // <-- Sesuai LaporanNeraca.php Anda
+                        'amount' => $transaction->amount,
+                    ]);
+                } else {
+                    // Jika modul 'finance' nonaktif, jangan buat jurnal
+                    Log::info('Modul Finance nonaktif. Jurnal DIBATALKAN untuk SavingTransaction ID: ' . $transaction->id);
                 }
-
-                // ===============================================
-                // PERBAIKAN LOGIKA JURNAL
-                // ===============================================
-
-                // Langkah A: Buat Jurnal HEADER
-                $journal = Journal::create([
-                    'foundation_id' => $transaction->foundation_id,
-                    'school_id' => $savingAccount->school_id, // <-- FIX 1: Ambil school_id dari rekening
-                    'date' => $transaction->created_at->toDateString(),
-                    'description' => $transaction->description,
-                    'referenceable_id' => $transaction->id,
-                    'referenceable_type' => SavingTransaction::class,
-                    'created_by' => $transaction->user_id,
-                ]);
-
-                // Langkah B: Buat Jurnal ENTRIES (Detail Debit & Kredit)
-                
-                // Entry Sisi DEBIT
-                $journal->entries()->create([
-                    'account_id' => $debitAccountId,
-                    'type' => 'debit', // <-- Sesuai LaporanNeraca.php Anda
-                    'amount' => $transaction->amount,
-                ]);
-
-                // Entry Sisi KREDIT
-                $journal->entries()->create([
-                    'account_id' => $creditAccountId,
-                    'type' => 'kredit', // <-- Sesuai LaporanNeraca.php Anda
-                    'amount' => $transaction->amount,
-                ]);
-                // ===============================================
-                // AKHIR PERBAIKAN
-                // ===============================================
 
             });
         } catch (\Exception $e) {
             Log::error("Gagal memproses SavingTransaction Observer (ID: {$transaction->id}): " . $e->getMessage());
-            // Hapus transaksi yg baru dibuat agar data tidak gantung
             $transaction->delete();
         }
     }

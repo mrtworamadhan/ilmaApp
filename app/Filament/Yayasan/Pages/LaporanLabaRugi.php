@@ -2,6 +2,7 @@
 
 namespace App\Filament\Yayasan\Pages;
 
+use App\Filament\Traits\HasModuleAccess;
 use App\Models\Account;
 use App\Models\JournalEntry;
 use App\Models\School;
@@ -22,8 +23,12 @@ use UnitEnum;
 
 class LaporanLabaRugi extends Page implements HasForms
 {
-    // 3. Gunakan Trait
-    use InteractsWithForms;
+    use InteractsWithForms, HasModuleAccess;
+    protected static string $requiredModule = 'finance';
+    public static function canViewAny(): bool
+    {
+        return static::canAccessWithRolesAndModule(['Admin Yayasan', 'Admin Sekolah']);
+    }
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
     protected static ?string $navigationLabel = 'Laporan Laba Rugi';
@@ -43,11 +48,6 @@ class LaporanLabaRugi extends Page implements HasForms
     public $hasilBeban = [];
     public $totalBeban = 0;
     public $labaRugi = 0;
-    public static function canAccess(): bool
-    {
-        // Ini sudah benar
-        return auth()->user()->hasRole(['Admin Yayasan', 'Admin Sekolah']);
-    }
 
     public function mount(): void
     {

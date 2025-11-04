@@ -2,6 +2,7 @@
 
 namespace App\Filament\Yayasan\Resources\SavingTransactions;
 
+use App\Filament\Traits\HasModuleAccess;
 use App\Filament\Yayasan\Resources\SavingTransactions\Pages\CreateSavingTransaction;
 use App\Filament\Yayasan\Resources\SavingTransactions\Pages\EditSavingTransaction;
 use App\Filament\Yayasan\Resources\SavingTransactions\Pages\ListSavingTransactions;
@@ -18,6 +19,12 @@ use Illuminate\Database\Eloquent\Model;
 
 class SavingTransactionResource extends Resource
 {
+    use HasModuleAccess;
+    protected static string $requiredModule = 'savings';
+    public static function canViewAny(): bool
+    {
+        return static::canAccessWithRolesAndModule(['Admin Yayasan', 'Admin Sekolah']);
+    }
     protected static ?string $model = SavingTransaction::class;
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedArrowsRightLeft;
     protected static string| UnitEnum |null $navigationGroup = 'Tabungan Siswa';

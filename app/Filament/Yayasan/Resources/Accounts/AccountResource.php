@@ -2,6 +2,7 @@
 
 namespace App\Filament\Yayasan\Resources\Accounts;
 
+use App\Filament\Traits\HasModuleAccess;
 use App\Filament\Yayasan\Resources\Accounts\Pages\CreateAccount;
 use App\Filament\Yayasan\Resources\Accounts\Pages\EditAccount;
 use App\Filament\Yayasan\Resources\Accounts\Pages\ListAccounts;
@@ -19,6 +20,14 @@ use Filament\Facades\Filament;
 
 class AccountResource extends Resource
 {
+    use HasModuleAccess;
+    protected static string $requiredModule = 'finance';
+    public static function canViewAny(): bool
+    {
+        return static::canAccessWithRolesAndModule(['Admin Yayasan', 'Admin Sekolah']);
+    }
+    
+    
     protected static ?string $model = Account::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::AtSymbol;
@@ -28,10 +37,7 @@ class AccountResource extends Resource
     protected static ?string $slug = 'akun-keuangan';
     protected static string | UnitEnum | null $navigationGroup  = 'Manajemen Keuangan';
     protected static ?int $navigationSort = 1; // Urutan pertama di grup
-    public static function canViewAny(): bool
-    {
-        return auth()->user()->hasRole(['Admin Yayasan', 'Admin Sekolah']);
-    }
+
     public static function getEloquentQuery(): Builder
     {
         // Otomatis filter data berdasarkan Yayasan yang login

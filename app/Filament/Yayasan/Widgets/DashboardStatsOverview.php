@@ -6,6 +6,8 @@ use App\Models\Bill;
 use App\Models\Expense;
 use App\Models\Payment;
 use App\Models\Student;
+use App\Models\Foundation;
+use Filament\Facades\Filament;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 use Illuminate\Support\Facades\Auth;
@@ -14,15 +16,16 @@ use Illuminate\Support\Number;
 
 class DashboardStatsOverview extends BaseWidget
 {
+    // public static function canView(): bool
+    // {
+    //     $tenant = Filament::getTenant();
+    //     // Cek apakah tenant ada DAN modul 'finance' aktif
+    //     return $tenant instanceof Foundation && $tenant->hasModule('finance');
+    // }
     protected static ?int $sort = 1;
     public function getColumns(): int | array
     {
         return 3;
-    }
-
-    public static function canView(): bool
-    {
-        return auth()->user()?->hasRole(['Admin Yayasan', 'Admin Sekolah']);
     }
 
     protected function getStats(): array

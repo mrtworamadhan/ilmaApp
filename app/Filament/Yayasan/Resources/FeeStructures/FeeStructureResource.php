@@ -2,6 +2,7 @@
 
 namespace App\Filament\Yayasan\Resources\FeeStructures;
 
+use App\Filament\Traits\HasModuleAccess;
 use App\Filament\Yayasan\Resources\FeeStructures\Pages\CreateFeeStructure;
 use App\Filament\Yayasan\Resources\FeeStructures\Pages\EditFeeStructure;
 use App\Filament\Yayasan\Resources\FeeStructures\Pages\ListFeeStructures;
@@ -19,6 +20,13 @@ use Illuminate\Database\Eloquent\Builder;
 
 class FeeStructureResource extends Resource
 {
+    use HasModuleAccess;
+    protected static string $requiredModule = 'finance';
+    public static function canViewAny(): bool
+    {
+        return static::canAccessWithRolesAndModule(['Admin Yayasan', 'Admin Sekolah']);
+    }
+
     protected static ?string $model = FeeStructure::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedCog6Tooth;
@@ -28,10 +36,6 @@ class FeeStructureResource extends Resource
     protected static ?string $slug = 'manajemen-biaya';
     protected static string | UnitEnum | null $navigationGroup  = 'Manajemen Biaya';
     protected static ?int $navigationSort = 1;
-    public static function canViewAny(): bool
-    {
-        return auth()->user()->hasRole(['Admin Yayasan', 'Admin Sekolah']);
-    }
 
     public static function getEloquentQuery(): Builder
     {

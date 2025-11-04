@@ -33,7 +33,10 @@ class PaymentObserver
                     Log::info('Status Bill ID: ' . $bill->id . ' diupdate menjadi PAID oleh Payment ID: ' . $payment->id);
                 }
             }
-
+            if (! $payment->foundation->hasModule('finance')) {
+                Log::info('Modul Finance nonaktif. Jurnal DIBATALKAN untuk Payment ID: ' . $payment->id);
+                return; // STOP, JANGAN BUAT JURNAL
+            }
             // --- Bagian 2: Buat Jurnal Otomatis ---
 
             // Tentukan Akun Debit (Kas/Bank) - Ini perlu logika lebih canggih nanti
