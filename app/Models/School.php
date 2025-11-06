@@ -38,5 +38,21 @@ class School extends Model
     {
         return $this->hasMany(Department::class);
     }
+    public function admissionBatches(): HasMany
+    {
+        return $this->hasMany(AdmissionBatch::class);
+    }
+
+    /**
+     * Definisi relasi: 1 Sekolah punya BANYAK Pendaftar PPDB
+     */
+    public function admissionRegistrations(): HasMany
+    {
+        return $this->hasMany(AdmissionRegistration::class);
+    }
+    public function teacherAttendances(): HasMany
+    {
+        return $this->hasMany(TeacherAttendance::class);
+    }
 
 }

@@ -97,15 +97,29 @@ class YayasanPanelProvider extends PanelProvider
                 slugAttribute: 'name',
                 ownershipRelationship: 'foundation'
             )
+            ->discoverResources(in: app_path('Filament/Yayasan/Resources'), for: 'App\Filament\Yayasan\Resources')
+            ->discoverPages(in: app_path('Filament/Yayasan/Pages'), for: 'App\Filament\Yayasan\Pages')
+            ->discoverWidgets(in: app_path('Filament/Yayasan/Widgets'), for: 'App\Filament\Yayasan\Widgets')
             
             ->navigationGroups([
-                NavigationGroup::make('Pengaturan')->label('Pengaturan'),
-                NavigationGroup::make('Data Master')->label('Data Master'),
-                NavigationGroup::make('Manajemen Keuangan')->label('Keuangan'), 
-                NavigationGroup::make('Tabungan')->label('Tabungan'), 
-                NavigationGroup::make('Akuntansi')->label('Akuntansi'), 
-                NavigationGroup::make('Anggaran')->label('Anggaran'), 
-                NavigationGroup::make('Laporan')->label('Laporan'), 
+                NavigationGroup::make('Pengaturan')
+                    ->label('Pengaturan'),
+                NavigationGroup::make('Data Master')
+                    ->label('Data Master'),
+                NavigationGroup::make('Kesiswaan')
+                    ->label('Kesiswaan'), 
+                NavigationGroup::make('Kepegawaian')
+                    ->label('Kepegawaian'),
+                NavigationGroup::make('Manajemen Keuangan')
+                    ->label('Keuangan'), 
+                NavigationGroup::make('Tabungan')
+                    ->label('Tabungan'), 
+                NavigationGroup::make('Akuntansi')
+                    ->label('Akuntansi'), 
+                NavigationGroup::make('Anggaran')
+                    ->label('Anggaran'), 
+                NavigationGroup::make('Laporan')
+                    ->label('Laporan'), 
             ])
 
             ->resources([
@@ -153,6 +167,8 @@ class YayasanPanelProvider extends PanelProvider
                 // Widget Keuangan (juga daftarkan statis)
                 DashboardFinancialOverview::class,
                 PemasukanPengeluaranChart::class,
-            ]);
+            ])
+            // ->active(Dashboard::class)
+            ->sidebarCollapsibleOnDesktop();
     }
 }

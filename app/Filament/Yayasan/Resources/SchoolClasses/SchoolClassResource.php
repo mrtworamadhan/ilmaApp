@@ -36,7 +36,7 @@ class SchoolClassResource extends Resource
     protected static ?string $recordTitleAttribute = 'name';
     protected static ?string $navigationLabel = 'Daftar Kelas';
     protected static ?string $slug = 'kelas';
-    protected static string | UnitEnum | null $navigationGroup  = 'Manajemen Siswa';
+    protected static string | UnitEnum | null $navigationGroup  = 'Data Master';
     protected static ?int $navigationSort = 1;
 
     public static function canViewAny(): bool

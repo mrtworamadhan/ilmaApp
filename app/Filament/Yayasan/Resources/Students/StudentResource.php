@@ -5,6 +5,7 @@ namespace App\Filament\Yayasan\Resources\Students;
 use App\Filament\Yayasan\Resources\Students\Pages\CreateStudent;
 use App\Filament\Yayasan\Resources\Students\Pages\EditStudent;
 use App\Filament\Yayasan\Resources\Students\Pages\ListStudents;
+use App\Filament\Yayasan\Resources\Students\RelationManagers\StudentRecordsRelationManager;
 use App\Filament\Yayasan\Resources\Students\Schemas\StudentForm;
 use App\Filament\Yayasan\Resources\Students\Tables\StudentsTable;
 use App\Models\Student;
@@ -28,7 +29,7 @@ class StudentResource extends Resource
     protected static ?string $recordTitleAttribute = 'name';
     protected static ?string $navigationLabel = 'Daftar Siswa';
     protected static ?string $slug = 'siswa';
-    protected static string | UnitEnum | null $navigationGroup  = 'Manajemen Siswa';
+    protected static string | UnitEnum | null $navigationGroup  = 'Data Master';
     protected static ?int $navigationSort = 2;
 
     public static function canViewAny(): bool
@@ -64,6 +65,7 @@ class StudentResource extends Resource
     {
         return [
             OptionalFeesRelationManager::class,
+            StudentRecordsRelationManager::class,
         ];
     }
 

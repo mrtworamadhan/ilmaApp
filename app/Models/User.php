@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Filament\Models\Contracts\HasTenants;
@@ -90,5 +91,17 @@ class User extends Authenticatable implements HasTenants
         // GANTI DARI: $relation->withoutGlobalScope(TenantScope::class);
         // MENJADI:
         return $relation->withoutGlobalScopes();
+    }
+    public function reportedStudentRecords(): HasMany
+    {
+        return $this->hasMany(StudentRecord::class, 'reported_by_user_id');
+    }
+    public function reportedAttendances(): HasMany
+    {
+        return $this->hasMany(StudentAttendance::class, 'reported_by_user_id');
+    }
+    public function reportedTeacherAttendances(): HasMany
+    {
+        return $this->hasMany(TeacherAttendance::class, 'reported_by_user_id');
     }
 }

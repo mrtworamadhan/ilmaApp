@@ -107,8 +107,6 @@ class LaporanBukuBesar extends Page implements HasForms, HasTable
             ]);
     }
 
-    // --- 7. Tombol 'Apply' Filter ---
-    // (Method ini dipanggil oleh form di view)
     public function applyFilters(): void
     {
         $data = $this->filterForm->getState();

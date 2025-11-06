@@ -68,19 +68,16 @@ class SavingTransactionObserver
                         'created_by' => $transaction->user_id,
                     ]);
 
-                    // Langkah B: Buat Jurnal ENTRIES (Detail Debit & Kredit)
-                    
-                    // Entry Sisi DEBIT
                     $journal->entries()->create([
                         'account_id' => $debitAccountId,
-                        'type' => 'debit', // <-- Sesuai LaporanNeraca.php Anda
+                        'type' => 'debit',
                         'amount' => $transaction->amount,
                     ]);
 
                     // Entry Sisi KREDIT
                     $journal->entries()->create([
                         'account_id' => $creditAccountId,
-                        'type' => 'kredit', // <-- Sesuai LaporanNeraca.php Anda
+                        'type' => 'kredit', 
                         'amount' => $transaction->amount,
                     ]);
                 } else {

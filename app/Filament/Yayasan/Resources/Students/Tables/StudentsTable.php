@@ -24,7 +24,7 @@ class StudentsTable
                     ->searchable()
                     ->sortable(),
                 
-                TextColumn::make('name')
+                TextColumn::make('full_name')
                     ->label('Nama Siswa')
                     ->searchable()
                     ->sortable(),
