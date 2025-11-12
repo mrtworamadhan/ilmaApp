@@ -16,7 +16,7 @@ return new class extends Migration
             $table->foreignId('foundation_id')->constrained()->cascadeOnDelete();
             $table->foreignId('saving_account_id')->constrained()->cascadeOnDelete();
 
-            $table->enum('type', ['CREDIT', 'DEBIT']); // CREDIT = Setor, DEBIT = Tarik
+            $table->enum('type', ['debit', 'kredit']);            
             $table->decimal('amount', 15, 2);
             $table->string('description');
 

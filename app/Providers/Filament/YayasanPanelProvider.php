@@ -90,6 +90,7 @@ class YayasanPanelProvider extends PanelProvider
             ])
             ->authMiddleware([
                 Authenticate::class,
+                'role:Admin Yayasan|Admin Sekolah|Staf|Guru|Staf Kesiswaan|Wali Kelas', // Pastikan HANYA role ini yg boleh masuk
             ])
             
             ->tenant(

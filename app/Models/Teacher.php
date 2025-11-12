@@ -2,10 +2,15 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
+use App\Models\Payroll\EmployeePayroll;
+use App\Models\Payroll\Payslip;
 
 class Teacher extends Model
 {
@@ -29,6 +34,7 @@ class Teacher extends Model
         'birth_date',
         'employment_status',
         'education_level',
+        'rfid_tag_id',
     ];
 
     /**
@@ -73,5 +79,18 @@ class Teacher extends Model
     {
         // Otomatis urutkan dari yang terbaru
         return $this->hasMany(TeacherAttendance::class)->orderBy('date', 'desc');
+    }
+    public function todaysAttendance(): HasOne
+    {
+        return $this->hasOne(TeacherAttendance::class)
+                    ->whereDate('date', Carbon::today());
+    }
+    public function payrolls(): HasMany
+    {
+        return $this->hasMany(EmployeePayroll::class);
+    }
+    public function payslip(): HasMany
+    {
+        return $this->hasMany(Payslip::class);
     }
 }

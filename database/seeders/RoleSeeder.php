@@ -19,5 +19,6 @@ class RoleSeeder extends Seeder
         Role::firstOrCreate(['name' => 'Admin Yayasan', 'guard_name' => 'web']);
         Role::firstOrCreate(['name' => 'Admin Sekolah', 'guard_name' => 'web']);
         Role::firstOrCreate(['name' => 'Kepala Bagian', 'guard_name' => 'web']);
+        Role::firstOrCreate(['name' => 'Kasir Kantin', 'guard_name' => 'web']);
     }
 }

@@ -92,6 +92,11 @@ class StudentForm
                                 TextInput::make('nisn')
                                     ->label('NISN')
                                     ->unique(ignoreRecord: true),
+                                TextInput::make('rfid_tag_id')
+                                    ->label('ID Kartu RFID')
+                                    ->unique(ignoreRecord: true) // Validasi unique, tapi abaikan record saat ini (untuk edit)
+                                    ->nullable()
+                                    ->placeholder('Tempelkan kartu untuk membaca ID'),
                                 Select::make('gender')
                                     ->label('Jenis Kelamin')
                                     ->options([
@@ -127,6 +132,7 @@ class StudentForm
                                 FileUpload::make('photo_path')
                                     ->label('Foto Siswa')
                                     ->image()
+                                    ->disk('public')
                                     ->directory('student-photos')
                                     ->columnSpanFull(),
                             ]),

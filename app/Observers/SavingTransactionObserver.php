@@ -20,54 +20,55 @@ class SavingTransactionObserver
         try {
             DB::transaction(function () use ($transaction) {
                 
-                // 1. UPDATE SALDO BUKU TABUNGAN (Ini sudah benar)
+                // 1. UPDATE SALDO BUKU TABUNGAN
                 $savingAccount = $transaction->savingAccount;
 
-                if ($transaction->type === 'CREDIT') {
+                // FIX #1: Cek pakai 'kredit' (lowercase)
+                if ($transaction->type === 'kredit') { 
                     $savingAccount->increment('balance', $transaction->amount);
-                } elseif ($transaction->type === 'DEBIT') {
+                } 
+                // FIX #2: Cek pakai 'debit' (lowercase)
+                elseif ($transaction->type === 'debit') { 
                     $savingAccount->decrement('balance', $transaction->amount);
                 }
 
                 
-                // 2. BUAT JURNAL (VERSI DOUBLE ENTRY YANG BENAR)
+                // 2. BUAT JURNAL
                 if ($transaction->foundation->hasModule('finance')) {
                     $akunKasTabungan = Account::where('foundation_id', $transaction->foundation_id)
-                                ->where('code', '1105') // <-- GANTI DARI 1101 ke 1105
-                                ->firstOrFail();
-                                
-                    $akunUtangTabungan = Account::where('foundation_id', $transaction->foundation_id)
-                                    ->where('code', '2102') // Asumsi 2102 = Utang Tabungan Siswa
+                                    ->where('code', '1105') // Kas Tabungan
                                     ->firstOrFail();
+                                    
+                    $akunUtangTabungan = Account::where('foundation_id', $transaction->foundation_id)
+                                            ->where('code', '2102') // Utang Tabungan Siswa
+                                            ->firstOrFail();
 
                     $debitAccountId = null;
                     $creditAccountId = null;
                     
-                    if ($transaction->type === 'CREDIT') {
-                        // SETOR: Kas (Debit), Utang Tabungan (Kredit)
+                    if ($transaction->type === 'kredit') {
                         $debitAccountId = $akunKasTabungan->id;
                         $creditAccountId = $akunUtangTabungan->id;
-                    } elseif ($transaction->type === 'DEBIT') {
-                        // TARIK: Utang Tabungan (Debit), Kas (Kredit)
+                    } elseif ($transaction->type === 'debit') {
                         $debitAccountId = $akunUtangTabungan->id;
                         $creditAccountId = $akunKasTabungan->id;
                     }
 
-                    // ===============================================
-                    // PERBAIKAN LOGIKA JURNAL
-                    // ===============================================
+                    // Jika $debitAccountId masih null (karena type tidak dikenal), 
+                    // firstOrFail() di bawah akan gagal dan memicu catch, 
+                    // yang mana itu perilaku yg benar.
 
-                    // Langkah A: Buat Jurnal HEADER
                     $journal = Journal::create([
                         'foundation_id' => $transaction->foundation_id,
-                        'school_id' => $savingAccount->school_id, // <-- FIX 1: Ambil school_id dari rekening
+                        'school_id' => $savingAccount->school_id, 
                         'date' => $transaction->created_at->toDateString(),
                         'description' => $transaction->description,
                         'referenceable_id' => $transaction->id,
                         'referenceable_type' => SavingTransaction::class,
-                        'created_by' => $transaction->user_id,
+                        'created_by' => $transaction->user_id ?? auth()->id(), // Fallback
                     ]);
 
+                    // Entry Sisi DEBIT
                     $journal->entries()->create([
                         'account_id' => $debitAccountId,
                         'type' => 'debit',
@@ -77,18 +78,14 @@ class SavingTransactionObserver
                     // Entry Sisi KREDIT
                     $journal->entries()->create([
                         'account_id' => $creditAccountId,
-                        'type' => 'kredit', 
+                        'type' => 'kredit', // FIX #3: Pastikan ini 'kredit' (Bahasa), BUKAN 'credit'
                         'amount' => $transaction->amount,
                     ]);
-                } else {
-                    // Jika modul 'finance' nonaktif, jangan buat jurnal
-                    Log::info('Modul Finance nonaktif. Jurnal DIBATALKAN untuk SavingTransaction ID: ' . $transaction->id);
                 }
-
             });
         } catch (\Exception $e) {
             Log::error("Gagal memproses SavingTransaction Observer (ID: {$transaction->id}): " . $e->getMessage());
-            $transaction->delete();
+            throw $e; 
         }
     }
 

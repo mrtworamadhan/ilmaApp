@@ -18,7 +18,7 @@ class BillsTable
         $isYayasanUser = auth()->user()->school_id === null;
         return $table
             ->columns([
-                TextColumn::make('student.name')
+                TextColumn::make('student.full_name')
                     ->label('Nama Siswa')
                     ->searchable(),
                 
@@ -70,7 +70,7 @@ class BillsTable
                             $query->where('school_id', auth()->user()->school_id);
                         }
                         
-                        return $query->pluck('name', 'id');
+                        return $query->pluck('full_name', 'id');
                     }),
                 
                 SelectFilter::make('status')

@@ -47,6 +47,12 @@ class TeacherForm
                             ->label('NIP / No. Pegawai')
                             ->unique(ignoreRecord: true),
                         
+                        TextInput::make('rfid_tag_id')
+                            ->label('ID Kartu RFID')
+                            ->unique(ignoreRecord: true)
+                            ->nullable()
+                            ->placeholder('Tempelkan kartu untuk membaca ID'),
+                        
                         Select::make('gender')
                             ->label('Jenis Kelamin')
                             ->options([

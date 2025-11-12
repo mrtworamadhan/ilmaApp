@@ -34,6 +34,10 @@ class TeachersTable
                 TextColumn::make('nip')
                     ->label('NIP')
                     ->searchable(),
+                TextColumn::make('rfid_tag_id')
+                    ->label('ID Kartu RFID')
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('phone')
                     ->label('No. Handphone')
                     ->searchable(),

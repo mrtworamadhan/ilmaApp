@@ -17,10 +17,8 @@ class UserForm
 {
     public static function configure(Schema $schema): Schema
     {
-        // 1. Dapatkan user yang sedang login
         $loggedInUser = auth()->user();
             
-        // 2. Tentukan apakah dia Admin Yayasan (true) atau Admin Sekolah (false)
         $isYayasanUser = $loggedInUser->school_id === null;
 
         return $schema
@@ -56,33 +54,20 @@ class UserForm
                     ->relationship(
                         name: 'school',
                         titleAttribute: 'name',
-                        modifyQueryUsing: fn (Builder $query) => 
+                        modifyQueryUsing: fn (Builder $query) =>
                             $query->where('foundation_id', Filament::getTenant()->id)
                     )
                     ->searchable()
                     ->preload()
                     ->live()
-                    
                     ->default(fn () => $isYayasanUser ? null : $loggedInUser->school_id)
-                    ->disabled(fn () => !$isYayasanUser) // Nonaktifkan jika BUKAN Admin Yayasan
-                    
-                    ->visible(function (\Filament\Schemas\Components\Utilities\Get $get) use ($isYayasanUser): bool {
-                        if (!$isYayasanUser) return true; // Admin Sekolah WAJIB lihat (meski disabled)
-
-                        $selectedRoleIds = $get('roles');
-                        if (empty($selectedRoleIds)) return true;
-                        
-                        $roleNames = Role::whereIn('id', $selectedRoleIds)->pluck('name')->toArray();
-                        
-                        return empty(array_intersect(['admin_yayasan', 'bendahara_yayasan'], $roleNames));
-                    })
-                    ->required(function (\Filament\Schemas\Components\Utilities\Get $get) use ($isYayasanUser): bool {
-                        if (!$isYayasanUser) return true;
-                        $selectedRoleIds = $get('roles');
-                        if (empty($selectedRoleIds)) return true;
-                        $roleNames = Role::whereIn('id', $selectedRoleIds)->pluck('name')->toArray();
-                        return empty(array_intersect(['admin_yayasan', 'bendahara_yayasan'], $roleNames));
-                    }),
+                    ->disabled(fn () => !$isYayasanUser)
+                    ->visible(fn (\Filament\Schemas\Components\Utilities\Get $get): bool => 
+                        static::shouldShowSchoolField($get, $isYayasanUser)
+                    )
+                    ->required(fn (\Filament\Schemas\Components\Utilities\Get $get): bool => 
+                        static::shouldRequireSchoolField($get, $isYayasanUser)
+                    ),
 
                 Select::make('department_id')
                     ->label('Departemen / Bagian')
@@ -105,7 +90,44 @@ class UserForm
                     ->preload() // <-- Tambahkan ini untuk performa
                     ->nullable(),
 
-                // HAPUS 'Hidden::make('school_id')' DARI SINI
             ]);
     }
+    protected static function shouldShowSchoolField($get, bool $isYayasanUser): bool
+    {
+        if (!$isYayasanUser) {
+            return true;
+        }
+
+        $selectedRoleIds = $get('roles');
+        if (empty($selectedRoleIds)) {
+            return true;
+        }
+
+        $roleNames = Role::withoutGlobalScopes()
+            ->whereIn('id', $selectedRoleIds)
+            ->pluck('name')
+            ->toArray();
+
+        return empty(array_intersect(['admin_yayasan', 'bendahara_yayasan'], $roleNames));
+    }
+
+    protected static function shouldRequireSchoolField($get, bool $isYayasanUser): bool
+    {
+        if (!$isYayasanUser) {
+            return true;
+        }
+
+        $selectedRoleIds = $get('roles');
+        if (empty($selectedRoleIds)) {
+            return true;
+        }
+
+        $roleNames = Role::withoutGlobalScopes()
+            ->whereIn('id', $selectedRoleIds)
+            ->pluck('name')
+            ->toArray();
+
+        return empty(array_intersect(['admin_yayasan', 'bendahara_yayasan'], $roleNames));
+    }
+
 }

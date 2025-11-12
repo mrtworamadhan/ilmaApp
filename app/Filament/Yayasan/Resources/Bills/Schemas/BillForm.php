@@ -46,14 +46,14 @@ class BillForm
                     ->label('Siswa')
                     ->relationship(
                         name: 'student',
-                        titleAttribute: 'name',
+                        titleAttribute: 'full_name',
                         modifyQueryUsing: fn (Builder $query) => 
                             $query
                                 ->where('foundation_id', Filament::getTenant()->id)
                                 // Jika user = Admin Sekolah, filter hanya siswa di sekolahnya
                                 ->when($userSchoolId, fn ($q) => $q->where('school_id', $userSchoolId))
                     )
-                    ->searchable(['name', 'nis']) 
+                    ->searchable(['full_name', 'nis']) 
                     ->preload()
                     ->required()
                     ->columnSpanFull(),

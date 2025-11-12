@@ -36,19 +36,19 @@ class FoundationForm
                             TextInput::make('npwp')
                                 ->label('NPWP'),
                         ]),
-                ])->columnSpan(1), // Grup ini mengambil 1 kolom
+                ])->columnSpan(1),
 
             // Kolom untuk Modul
             Group::make()
                 ->schema([
-                    // === INI BAGIAN UTAMA KITA ===
                     Section::make('Modul Aktif')
                         ->schema([
                             CheckboxList::make('enabled_modules')
                                 ->label('Silakan centang modul yang dibeli:')
                                 ->options([
                                     'finance'       => 'Keuangan (Akuntansi, SPP, Budgeting)',
-                                    'savings'       => 'Tabungan Siswa (Dasar)', // <-- TAMBAHKAN INI
+                                    'payroll'       => 'Payroll Gaji Guru & Karyawan',
+                                    'savings'       => 'Tabungan Siswa (Dasar)',
                                     'cashless'      => 'Cashless (Kantin & RFID)',
                                     'ppdb'          => 'PPDB (Penerimaan Siswa Baru)',
                                     'attendance'    => 'Absensi (Siswa & Guru)',

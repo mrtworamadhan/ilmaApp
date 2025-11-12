@@ -18,7 +18,7 @@ class SavingTransactionsTable
                     ->label('Tanggal')
                     ->dateTime('d-m-Y H:i')
                     ->sortable(),
-                TextColumn::make('savingAccount.student.name')
+                TextColumn::make('savingAccount.student.full_name')
                     ->label('Siswa')
                     ->searchable()
                     ->sortable(),

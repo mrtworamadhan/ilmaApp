@@ -8,6 +8,7 @@ use Filament\Actions\BulkAction;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Collection;
@@ -19,6 +20,12 @@ class StudentsTable
         $isYayasanUser = auth()->user()->school_id === null;
         return $table
             ->columns([
+                ImageColumn::make('photo_path')
+                    ->label('Foto Siswa')
+                    ->disk('public')
+                    ->visibility('public')
+                    ->circular(),
+                    
                 TextColumn::make('nis')
                     ->label('NIS')
                     ->searchable()
@@ -29,11 +36,10 @@ class StudentsTable
                     ->searchable()
                     ->sortable(),
                 
-                // Tampilkan kolom Sekolah HANYA jika Admin Yayasan
                 TextColumn::make('school.name')
                     ->label('Sekolah')
                     ->badge()
-                    ->hidden(!$isYayasanUser), // Sembunyikan jika Admin Sekolah
+                    ->hidden(!$isYayasanUser),
                 
                 TextColumn::make('schoolClass.name')
                     ->label('Kelas')
@@ -41,6 +47,11 @@ class StudentsTable
                     
                 TextColumn::make('va_number')
                     ->label('Virtual Account (VA)')
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+
+                TextColumn::make('rfid_tag_id')
+                    ->label('ID Kartu RFID')
                     ->searchable()
                     ->toggleable(isToggledHiddenByDefault: true),
                 

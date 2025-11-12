@@ -5,6 +5,10 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Models\Pos\Product;
+use App\Models\Pos\SaleTransaction;
+use App\Models\Pos\Vendor;
+use App\Models\Pos\VendorLedger;
 
 class Foundation extends Model
 {
@@ -44,5 +48,34 @@ class Foundation extends Model
     public function hasModule(string $module): bool
     {
         return in_array($module, $this->enabled_modules ?? []);
+    }
+
+    public function vendors(): HasMany
+    {
+        return $this->hasMany(Vendor::class);
+    }
+
+    /**
+     * Get all of the products for the Foundation
+     */
+    public function products(): HasMany
+    {
+        return $this->hasMany(Product::class);
+    }
+
+    /**
+     * Get all of the saleTransactions for the Foundation
+     */
+    public function saleTransactions(): HasMany
+    {
+        return $this->hasMany(SaleTransaction::class);
+    }
+
+    /**
+     * Get all of the vendorLedgers for the Foundation
+     */
+    public function vendorLedgers(): HasMany
+    {
+        return $this->hasMany(VendorLedger::class);
     }
 }

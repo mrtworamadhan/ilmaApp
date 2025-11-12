@@ -23,14 +23,14 @@ class SavingAccountForm
                         // Jika 'edit', tampilkan nama siswa yg sedang diedit
                         if ($record) {
                             return Student::where('id', $record->student_id)
-                                ->pluck('name', 'id');
+                                ->pluck('full_name', 'id');
                         }
                         
                         // Jika 'create', filter siswa
                         $tenant = Filament::getTenant();
                         return Student::where('foundation_id', $tenant->id)
                             ->doesntHave('savingAccount') // <-- Kunci: 'savingAccount' adalah nama relasi HasOne
-                            ->pluck('name', 'id');
+                            ->pluck('full_name', 'id');
                     })
                     ->searchable()
                     ->required()

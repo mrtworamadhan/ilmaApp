@@ -10,6 +10,7 @@ use App\Filament\Yayasan\Resources\SavingTransactions\Schemas\SavingTransactionF
 use App\Filament\Yayasan\Resources\SavingTransactions\Tables\SavingTransactionsTable;
 use App\Models\SavingTransaction;
 use BackedEnum;
+use Illuminate\Database\Eloquent\Builder;
 use UnitEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
@@ -31,6 +32,20 @@ class SavingTransactionResource extends Resource
     protected static ?string $navigationLabel = 'Riwayat Transaksi';
     protected static ?string $slug = 'tabungan/riwayat-transaksi';
     protected static ?int $navigationSort = 2;
+    public static function getEloquentQuery(): Builder
+    {
+        $query = parent::getEloquentQuery();
+        $userSchoolId = auth()->user()->school_id;
+
+        if ($userSchoolId) {
+            $query->whereHas('savingAccount', function ($q) use ($userSchoolId) {
+                $q->where('school_id', $userSchoolId);
+            });
+        }
+
+        return $query;
+    }
+
     public static function canCreate(): bool
     {
         return false;

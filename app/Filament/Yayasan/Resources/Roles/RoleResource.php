@@ -27,11 +27,16 @@ class RoleResource extends Resource
     protected static ?string $navigationLabel = 'Role User';
 
     protected static ?int $navigationSort = 3;
+    protected static ?string $tenantOwnershipRelationshipName = '';
 
     protected static ?string $recordTitleAttribute = 'name';
     public static function canViewAny(): bool
     {
         return auth()->user()->hasRole('Admin Yayasan');
+    }
+    public static function canCreate(): bool
+    {
+        return false;
     }
     public static function isTenantAware(): bool
     {
@@ -42,37 +47,38 @@ class RoleResource extends Resource
     {
         return parent::getEloquentQuery()->withoutGlobalScopes();
     }
-    public static function form(Schema $schema): Schema
-    {
-        return $schema
-            ->components([
-                TextInput::make('name')
-                    ->required()
-                    ->maxLength(255)
-                    ->unique(ignoreRecord: true),
-            ]);
-    }
+    // public static function form(Schema $schema): Schema
+    // {
+    //     return $schema
+    //         ->components([
+    //             TextInput::make('name')
+    //                 ->required()
+    //                 ->maxLength(255)
+    //                 ->unique(ignoreRecord: true),
+    //         ]);
+    // }
 
     public static function table(Table $table): Table
     {
         return $table
             ->recordTitleAttribute('name')
             ->columns([
-                TextColumn::make('name'),
-                TextColumn::make('created_at')
-                    ->dateTime('d-M-Y')
+                TextColumn::make('name')
+                    ->label('Nama Role')
+                    ->searchable()
                     ->sortable(),
+                TextColumn::make('deskripsi'),
             ])
             ->filters([
                 //
             ])
             ->recordActions([
-                EditAction::make(),
-                DeleteAction::make(),
+                // EditAction::make(),
+                // DeleteAction::make(),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
-                    DeleteBulkAction::make(),
+                    // DeleteBulkAction::make(),
                 ]),
             ]);
     }

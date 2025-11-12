@@ -65,8 +65,6 @@ class AdminPanelProvider extends PanelProvider
     }
     public function canAccessPanel(Authenticatable $user): bool
     {
-        // Cek apakah user yang sedang login adalah instance dari App\Models\User
-        // DAN periksa apakah kolom 'is_platform_admin' miliknya true
         return $user instanceof User && $user->is_platform_admin;
     }
 }

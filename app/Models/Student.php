@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -44,6 +45,7 @@ class Student extends Model
         'guardian_phone', 
         'va_number',
         'status',
+        'rfid_tag_id',
     ];
 
     // Relasi ke Yayasan (Tenant)
@@ -85,5 +87,10 @@ class Student extends Model
     {
         // Otomatis urutkan dari yang terbaru
         return $this->hasMany(StudentAttendance::class)->orderBy('date', 'desc');
+    }
+    public function todaysAttendance(): HasOne
+    {
+        return $this->hasOne(StudentAttendance::class)
+                    ->whereDate('date', Carbon::today());
     }
 }

@@ -24,7 +24,7 @@ class CreateBill extends CreateRecord
         }
         
         if (empty($student->school_id)) {
-            throw new \Exception("Student '{$student->name}' tidak memiliki school_id.");
+            throw new \Exception("Student '{$student->full_name}' tidak memiliki school_id.");
         }
         
         $data['school_id'] = $student->school_id;

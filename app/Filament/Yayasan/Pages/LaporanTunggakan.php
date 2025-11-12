@@ -105,7 +105,7 @@ class LaporanTunggakan extends Page implements HasForms, HasTable
                         if ($schoolId) $query->where('school_id', $schoolId);
                         if ($classId) $query->where('class_id', $classId);
                         
-                        return $query->pluck('name', 'id');
+                        return $query->pluck('full_name', 'id');
                     })
                     ->searchable()
                     ->live()
@@ -159,7 +159,7 @@ class LaporanTunggakan extends Page implements HasForms, HasTable
                 return $query->orderBy('due_date', 'asc');
             })
             ->columns([
-                TextColumn::make('student.name')
+                TextColumn::make('student.full_name')
                     ->label('Nama Siswa')
                     ->searchable(),
                 

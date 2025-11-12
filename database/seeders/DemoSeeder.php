@@ -31,7 +31,8 @@ class DemoSeeder extends Seeder
         $roleAdminSekolah = Role::firstOrCreate(['name' => 'Admin Sekolah', 'guard_name' => 'web']);
         $roleOrtu = Role::firstOrCreate(['name' => 'Orang Tua', 'guard_name' => 'web']);
         Role::firstOrCreate(['name' => 'Kepala Bagian', 'guard_name' => 'web']);
-
+        $roleKasirKantin = Role::findOrCreate('Kasir Kantin');
+        
         // 1. Buat 1 Yayasan (Tenant)
         $this->command->info('Membuat Yayasan...');
         $foundation = Foundation::create([

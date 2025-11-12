@@ -10,6 +10,7 @@ use App\Filament\Yayasan\Resources\SavingAccounts\Schemas\SavingAccountForm;
 use App\Filament\Yayasan\Resources\SavingAccounts\Tables\SavingAccountsTable;
 use App\Models\SavingAccount;
 use BackedEnum;
+use Illuminate\Database\Eloquent\Builder;
 use UnitEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
@@ -33,6 +34,18 @@ class SavingAccountResource extends Resource
     protected static ?string $slug = 'tabungan/buku-tabungan';
     protected static ?int $navigationSort = 1;
     protected static ?string $recordTitleAttribute = 'name';
+    
+    public static function getEloquentQuery(): Builder
+    {
+        $query = parent::getEloquentQuery(); 
+        $userSchoolId = auth()->user()->school_id;
+
+        if ($userSchoolId) {
+            $query->where('school_id', $userSchoolId);
+        }
+        
+        return $query;
+    }
 
     public static function form(Schema $schema): Schema
     {

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Foundation;
 use App\Models\School;
+use App\Models\Pos\Vendor;
 use Filament\Facades\Filament;
 use Filament\Panel;
 use Filament\Tenancy\Tenant;
@@ -12,6 +13,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Filament\Models\Contracts\HasTenants;
@@ -19,6 +22,7 @@ use Illuminate\Support\Facades\Auth;
 use Spatie\Permission\Traits\HasRoles;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Filament\Models\TenantScope;
+use App\Models\Payroll\EmployeePayroll;
 
 class User extends Authenticatable implements HasTenants
 {
@@ -65,7 +69,6 @@ class User extends Authenticatable implements HasTenants
 
     public function getTenants(Panel $panel): \Illuminate\Support\Collection
     {
-        // Jika 1 user hanya punya 1 foundation:
         return collect([$this->foundation])->filter();
     }
 
@@ -78,8 +81,10 @@ class User extends Authenticatable implements HasTenants
     {
         return $this->belongsTo(Department::class);
     }
+
     public function roles(): MorphToMany
     {
+
         $relation = $this->morphToMany(
             config('permission.models.role'),
             'model',
@@ -88,10 +93,9 @@ class User extends Authenticatable implements HasTenants
             config('permission.column_names.role_morph_key')
         );
 
-        // GANTI DARI: $relation->withoutGlobalScope(TenantScope::class);
-        // MENJADI:
         return $relation->withoutGlobalScopes();
     }
+    
     public function reportedStudentRecords(): HasMany
     {
         return $this->hasMany(StudentRecord::class, 'reported_by_user_id');
@@ -103,5 +107,14 @@ class User extends Authenticatable implements HasTenants
     public function reportedTeacherAttendances(): HasMany
     {
         return $this->hasMany(TeacherAttendance::class, 'reported_by_user_id');
+    }
+    public function vendor(): HasOne
+    {
+        return $this->hasOne(Vendor::class);
+    }
+    public function payrolls(): MorphMany
+    {
+        // Relasi polimorfik ke tabel employee_payrolls
+        return $this->morphMany(EmployeePayroll::class, 'employable');
     }
 }
