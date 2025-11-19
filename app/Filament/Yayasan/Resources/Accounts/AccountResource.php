@@ -22,11 +22,10 @@ class AccountResource extends Resource
 {
     use HasModuleAccess;
     protected static string $requiredModule = 'finance';
-    public static function canViewAny(): bool
+    public static function canAccess(): bool
     {
         return static::canAccessWithRolesAndModule(['Admin Yayasan', 'Admin Sekolah']);
     }
-    
     
     protected static ?string $model = Account::class;
 
@@ -47,6 +46,7 @@ class AccountResource extends Resource
 
     public static function form(Schema $schema): Schema
     {
+        
         return AccountForm::configure($schema);
     }
 

@@ -13,7 +13,8 @@ class ListDisbursementRequests extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            CreateAction::make()->label('Buat Pengajuan'),
+            CreateAction::make()
+                ->label('Ajukan Pencairan Baru'),
         ];
     }
 }

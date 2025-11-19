@@ -31,7 +31,7 @@ class DepartmentResource extends Resource
 
     protected static ?string $recordTitleAttribute = 'name';
 
-    public static function canViewAny(): bool
+    public static function canAccess(): bool
     {
         return auth()->user()->hasRole(['Admin Yayasan', 'Admin Sekolah']);
     }

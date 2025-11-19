@@ -7,6 +7,7 @@ use App\Models\Account;
 use App\Models\JournalEntry;
 use App\Models\School;
 use App\Models\Bill;
+use Filament\Actions\Action;
 use Filament\Pages\Page;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Forms\Concerns\InteractsWithForms;
@@ -21,18 +22,22 @@ use Illuminate\Database\Eloquent\Builder;
 use Filament\Support\Icons\Heroicon;
 use BackedEnum;
 use UnitEnum;
+use Maatwebsite\Excel\Facades\Excel; 
+use App\Exports\LaporanNeracaExport; // <-- Tambahkan ini
+use Barryvdh\DomPDF\Facade\Pdf; // <-- Tambahkan ini
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class LaporanNeraca extends Page implements HasForms
 {
     use InteractsWithForms, HasModuleAccess;
     protected static string $requiredModule = 'finance';
-    public static function canViewAny(): bool
+    public static function canAccess(): bool // <-- BENAR (Ini untuk Page)
     {
         return static::canAccessWithRolesAndModule(['Admin Yayasan', 'Admin Sekolah']);
     }
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
     protected static ?string $navigationLabel = 'Laporan Neraca';
-    protected string $view = 'filament.yayasan.pages.laporan-neraca';
+    protected string $view = 'filament.yayasan.pages.laporan-neraca'; // <-- Pastikan view-nya benar
     protected static string | UnitEnum | null $navigationGroup  = 'Laporan';
     protected static ?int $navigationSort = 5;
     protected static ?string $slug = 'laporan/neraca';
@@ -41,164 +46,252 @@ class LaporanNeraca extends Page implements HasForms
     public ?string $startDate = null;
     public ?string $endDate = null;
 
+    // Properti untuk menyimpan hasil
     public $hasilAktiva = [];
     public $totalAktiva = 0;
     public $hasilKewajiban = [];
     public $totalKewajiban = 0;
     public $hasilEkuitas = [];
     public $totalEkuitas = 0;
-    public $labaRugiPeriodeIni = 0;
-    
-    public $piutangTunggakan = 0;
-    public $totalAktivaTermasukPiutang = 0;
     public $labaDitangguhkan = 0;
-    public $totalEkuitasTermasukLabaDitangguhkan = 0;
+    public $labaRugiPeriodeIni = 0;
+    public $totalKewajibanDanEkuitas = 0;
+    protected function getHeaderActions(): array
+    {
+        return [
+            Action::make('exportExcel')
+                ->label('Export Excel')
+                ->icon('heroicon-o-document-arrow-down')
+                ->color('success')
+                ->action('exportExcel'), // Panggil method exportExcel
+
+            Action::make('exportPdf')
+                ->label('Export PDF')
+                ->icon('heroicon-o-document-text')
+                ->color('danger')
+                ->action('exportPdf'), // Panggil method exportPdf
+        ];
+    }
     public function mount(): void
     {
-        $this->startDate = now()->startOfYear()->format('Y-m-d');
-        $this->endDate = now()->format('Y-m-d');
-        
-        $userSchoolId = auth()->user()->school_id;
-        $isYayasanUser = auth()->user()->school_id === null;
-        
-        $this->selectedSchool = $isYayasanUser ? null : $userSchoolId;
-
-        $this->filterForm->fill([
-            'selectedSchool' => $this->selectedSchool,
-            'startDate' => $this->startDate,
-            'endDate' => $this->endDate,
-        ]);
-
+        $this->startDate = Carbon::now()->startOfYear()->toDateString();
+        $this->endDate = Carbon::now()->endOfDay()->toDateString();
         $this->applyFilters();
     }
 
-    // --- Definisi Form Filter ---
     public function filterForm(Schema $form): Schema
     {
         return $form
-            ->components([
+            ->schema([
                 Select::make('selectedSchool')
-                    ->label('Filter per Sekolah')
-                    ->options(
-                        School::where('foundation_id', Filament::getTenant()->id)
-                            ->pluck('name', 'id')
-                    )
+                    ->label('Pilih Sekolah')
+                    ->options(fn () => School::where('foundation_id', Filament::getTenant()->id)->pluck('name', 'id'))
+                    ->placeholder('Semua Sekolah (Level Yayasan)')
                     ->searchable()
-                    ->hidden(fn () => auth()->user()->school_id !== null)
-                    ->placeholder('Semua Sekolah (Gabungan)'),
-
+                    ->hidden(fn () => !auth()->user()->hasRole('Admin Yayasan')),
                 DatePicker::make('startDate')
-                    ->label('Laba/Rugi Mulai Tgl')
-                    ->default(now()->startOfYear())
+                    ->label('Tanggal Mulai')
+                    ->default($this->startDate)
                     ->required(),
-
                 DatePicker::make('endDate')
-                    ->label('Posisi Neraca per Tgl')
-                    ->default(now())
+                    ->label('Tanggal Selesai')
+                    ->default($this->endDate)
                     ->required(),
-            ]);
+            ])
+            ->columns(3);
     }
 
-    // --- Fungsi untuk menghitung ---
+    // ========================================================
+    // KODE YANG HILANG (DITAMBAHKAN KEMBALI)
+    // ========================================================
+    protected function rules(): array
+    {
+        return [
+            'selectedSchool' => 'nullable|integer',
+            'startDate' => 'required|date',
+            'endDate' => 'required|date|after_or_equal:startDate',
+        ];
+    }
+    // ========================================================
+
     public function applyFilters(): void
     {
-        $data = $this->filterForm->getState();
-        $this->startDate = $data['startDate'];
-        $this->endDate = $data['endDate'];
+        $this->validate(); // <-- Panggilan ini sekarang valid
 
-        $userSchoolId = auth()->user()->school_id;
-        $isYayasanUser = auth()->user()->school_id === null;
-        
-        $schoolId = $isYayasanUser ? ($data['selectedSchool'] ?? null) : $userSchoolId;
+        $isYayasanUser = $this->selectedSchool === null && auth()->user()->hasRole('Admin Yayasan');
+        $schoolId = $isYayasanUser ? null : ($this->selectedSchool ?? auth()->user()->school_id);
 
-        // --- FUNGSI HELPER UNTUK QUERY SALDO ---
-        $getAccountBalance = function ($accountType, $endDate, $schoolId) use ($isYayasanUser) {
-            $query = Account::query()
-                ->where('foundation_id', Filament::getTenant()->id)
-                ->where('type', $accountType)
-                ->select('accounts.id', 'accounts.name')
-                ->addSelect(['balance' => JournalEntry::select(DB::raw("SUM(CASE WHEN journal_entries.type = 'debit' THEN amount ELSE -amount END)"))
-                    ->join('journals', 'journal_entries.journal_id', '=', 'journals.id')
-                    ->whereColumn('journal_entries.account_id', 'accounts.id')
-                    ->where('journals.date', '<=', $endDate)
-                    ->when($schoolId || !$isYayasanUser, function ($q) use ($schoolId) {
-                        return $q->where('journals.school_id', $schoolId);
-                    })
-                ])
-                ->withCasts(['balance' => 'float']);
-            return $query->get();
-        };
-
-        $getAccountBalanceKredit = function ($accountType, $endDate, $schoolId) use ($isYayasanUser) {
-             $query = Account::query()
-                ->where('foundation_id', Filament::getTenant()->id)
-                ->where('type', $accountType)
-                ->select('accounts.id', 'accounts.name')
-                ->addSelect(['balance' => JournalEntry::select(DB::raw("SUM(CASE WHEN journal_entries.type = 'kredit' THEN amount ELSE -amount END)"))
-                    ->join('journals', 'journal_entries.journal_id', '=', 'journals.id')
-                    ->whereColumn('journal_entries.account_id', 'accounts.id')
-                    ->where('journals.date', '<=', $endDate)
-                    ->when($schoolId || !$isYayasanUser, function ($q) use ($schoolId) {
-                        return $q->where('journals.school_id', $schoolId);
-                    })
-                ])
-                ->withCasts(['balance' => 'float']);
-            return $query->get();
-        };
-
-        // --- 1. HITUNG AKTIVA ---
-        $this->hasilAktiva = $getAccountBalance('aktiva', $this->endDate, $schoolId);
-        $this->totalAktiva = $this->hasilAktiva->sum('balance');
-
-        // --- 2. HITUNG PIUTANG DARI TUNGGAKAN ---
-        $this->piutangTunggakan = Bill::query()
-            ->where('foundation_id', Filament::getTenant()->id)
-            ->whereIn('status', ['unpaid', 'overdue'])
-            ->when($schoolId || !$isYayasanUser, function ($q) use ($schoolId) {
-                return $q->where('school_id', $schoolId);
-            })
-            ->sum('amount');
-
-        // --- 3. TOTAL AKTIVA + PIUTANG TUNGGAKAN ---
-        $this->totalAktivaTermasukPiutang = $this->totalAktiva + $this->piutangTunggakan;
-
-        // --- 4. HITUNG KEWAJIBAN ---
-        $this->hasilKewajiban = $getAccountBalanceKredit('kewajiban', $this->endDate, $schoolId);
-        $this->totalKewajiban = $this->hasilKewajiban->sum('balance');
-
-        // --- 5. HITUNG EKUITAS ---
-        $this->hasilEkuitas = $getAccountBalanceKredit('ekuitas', $this->endDate, $schoolId);
-        $this->totalEkuitas = $this->hasilEkuitas->sum('balance');
-
-        // --- 6. HITUNG LABA DITANGGUHKAN (PENYEIMBANG PIUTANG) ---
-        $this->labaDitangguhkan = $this->piutangTunggakan;
-
-        // --- 7. HITUNG LABA RUGI PERIODE BERJALAN ---
-        $totalPendapatan = JournalEntry::join('journals', 'journal_entries.journal_id', '=', 'journals.id')
+        $baseQuery = fn ($type) => JournalEntry::join('journals', 'journal_entries.journal_id', '=', 'journals.id')
             ->join('accounts', 'journal_entries.account_id', '=', 'accounts.id')
-            ->where('accounts.type', 'pendapatan')
-            ->where('journals.foundation_id', Filament::getTenant()->id)
-            ->whereBetween('journals.date', [$this->startDate, $this->endDate])
-            ->when($schoolId || !$isYayasanUser, function ($q) use ($schoolId) {
+            ->where('accounts.foundation_id', Filament::getTenant()->id)
+            ->where('journals.date', '<=', $this->endDate) // Neraca dihitung s/d tanggal akhir
+            ->when($schoolId, function ($q) use ($schoolId) {
                 return $q->where('journals.school_id', $schoolId);
             })
+            // REFACTOR Tipe Akun ISAK 35
+            ->where('accounts.type', $type); 
+
+        // --- 1. AMBIL ASET ---
+        $this->hasilAktiva = $baseQuery('Aset') // <-- REFACTOR
+            ->select('accounts.name', 'accounts.type',
+                DB::raw('SUM(CASE WHEN journal_entries.type = "debit" THEN journal_entries.amount ELSE 0 END) as total_debit'),
+                DB::raw('SUM(CASE WHEN journal_entries.type = "kredit" THEN journal_entries.amount ELSE 0 END) as total_kredit')
+            )
+            ->groupBy('accounts.name', 'accounts.type')
+            ->get();
+        
+        $this->totalAktiva = 0;
+        foreach ($this->hasilAktiva as $akun) {
+            $akun->balance = $akun->total_debit - $akun->total_kredit;
+            $this->totalAktiva += $akun->balance;
+        }
+
+        // --- 2. AMBIL LIABILITAS ---
+        $this->hasilKewajiban = $baseQuery('Liabilitas') // <-- REFACTOR
+            ->select('accounts.name', 'accounts.type',
+                DB::raw('SUM(CASE WHEN journal_entries.type = "debit" THEN journal_entries.amount ELSE 0 END) as total_debit'),
+                DB::raw('SUM(CASE WHEN journal_entries.type = "kredit" THEN journal_entries.amount ELSE 0 END) as total_kredit')
+            )
+            ->groupBy('accounts.name', 'accounts.type')
+            ->get();
+        
+        $this->totalKewajiban = 0;
+        foreach ($this->hasilKewajiban as $akun) {
+            $akun->balance = $akun->total_kredit - $akun->total_debit;
+            $this->totalKewajiban += $akun->balance;
+        }
+
+        // --- 3. AMBIL ASET NETO ---
+        $this->hasilEkuitas = $baseQuery('Aset Neto') // <-- REFACTOR
+            ->select('accounts.name', 'accounts.type',
+                DB::raw('SUM(CASE WHEN journal_entries.type = "debit" THEN journal_entries.amount ELSE 0 END) as total_debit'),
+                DB::raw('SUM(CASE WHEN journal_entries.type = "kredit" THEN journal_entries.amount ELSE 0 END) as total_kredit')
+            )
+            ->groupBy('accounts.name', 'accounts.type')
+            ->get();
+        
+        $this->totalEkuitas = 0;
+        foreach ($this->hasilEkuitas as $akun) {
+            $akun->balance = $akun->total_kredit - $akun->total_debit;
+            $this->totalEkuitas += $akun->balance;
+        }
+
+        // --- 4. HITUNG LABA DITANGGUHKAN (Laba s/d PERIODE SEBELUMNYA) ---
+        $totalPendapatanLalu = JournalEntry::join('journals', 'journal_entries.journal_id', '=', 'journals.id')
+            ->join('accounts', 'journal_entries.account_id', '=', 'accounts.id')
+            ->where('accounts.type', 'Pendapatan') // <-- REFACTOR
+            ->where('journals.foundation_id', Filament::getTenant()->id)
+            ->where('journals.date', '<', $this->startDate) // SEBELUM Tanggal Mulai
+            ->when($schoolId, fn ($q) => $q->where('journals.school_id', $schoolId))
+            ->where('journal_entries.type', 'kredit')
+            ->sum('journal_entries.amount');
+
+        $totalBebanLalu = JournalEntry::join('journals', 'journal_entries.journal_id', '=', 'journals.id')
+            ->join('accounts', 'journal_entries.account_id', '=', 'accounts.id')
+            ->where('accounts.type', 'Beban') // <-- REFACTOR
+            ->where('journals.foundation_id', Filament::getTenant()->id)
+            ->where('journals.date', '<', $this->startDate) // SEBELUM Tanggal Mulai
+            ->when($schoolId, fn ($q) => $q->where('journals.school_id', $schoolId))
+            ->where('journal_entries.type', 'debit')
+            ->sum('journal_entries.amount');
+            
+        $this->labaDitangguhkan = $totalPendapatanLalu - $totalBebanLalu;
+
+        // --- 5. HITUNG LABA RUGI PERIODE INI (Laba SELAMA PERIODE BERJALAN) ---
+        $totalPendapatan = JournalEntry::join('journals', 'journal_entries.journal_id', '=', 'journals.id')
+            ->join('accounts', 'journal_entries.account_id', '=', 'accounts.id')
+            ->where('accounts.type', 'Pendapatan') // <-- REFACTOR
+            ->where('journals.foundation_id', Filament::getTenant()->id)
+            ->whereBetween('journals.date', [$this->startDate, $this->endDate])
+            ->when($schoolId, fn ($q) => $q->where('journals.school_id', $schoolId))
             ->where('journal_entries.type', 'kredit')
             ->sum('journal_entries.amount');
 
         $totalBeban = JournalEntry::join('journals', 'journal_entries.journal_id', '=', 'journals.id')
             ->join('accounts', 'journal_entries.account_id', '=', 'accounts.id')
-            ->where('accounts.type', 'beban')
+            ->where('accounts.type', 'Beban') // <-- REFACTOR
             ->where('journals.foundation_id', Filament::getTenant()->id)
             ->whereBetween('journals.date', [$this->startDate, $this->endDate])
-            ->when($schoolId || !$isYayasanUser, function ($q) use ($schoolId) {
-                return $q->where('journals.school_id', $schoolId);
-            })
+            ->when($schoolId, fn ($q) => $q->where('journals.school_id', $schoolId))
             ->where('journal_entries.type', 'debit')
             ->sum('journal_entries.amount');
             
         $this->labaRugiPeriodeIni = $totalPendapatan - $totalBeban;
 
-        // --- 8. TOTAL EKUITAS TERMASUK LABA DITANGGUHKAN ---
-        $this->totalEkuitasTermasukLabaDitangguhkan = $this->totalEkuitas + $this->labaRugiPeriodeIni + $this->labaDitangguhkan;
+        // --- 6. TOTAL EKUITAS TERMASUK LABA DITANGGUHKAN ---
+        $this->totalEkuitas += ($this->labaDitangguhkan + $this->labaRugiPeriodeIni);
+
+        // --- 7. TOTAL KEWAJIBAN + EKUITAS ---
+        $this->totalKewajibanDanEkuitas = $this->totalKewajiban + $this->totalEkuitas;
+    }
+    public function exportExcel()
+    {
+        // 1. Jalankan filter terlebih dahulu untuk memastikan data terbaru
+        $this->applyFilters();
+
+        // 2. Siapkan data tambahan
+        $namaSekolah = $this->selectedSchool
+            ? School::find($this->selectedSchool)?->name
+            : 'Semua Sekolah (Level Yayasan)';
+            
+        $fileName = "laporan_neraca_{$this->startDate}_sd_{$this->endDate}.xlsx";
+
+        // 3. Panggil Maatwebsite Excel untuk download
+        return Excel::download(new LaporanNeracaExport(
+            $this->hasilAktiva,
+            $this->totalAktiva,
+            $this->hasilKewajiban,
+            $this->totalKewajiban,
+            $this->hasilEkuitas,
+            $this->totalEkuitas,
+            $this->labaDitangguhkan,
+            $this->labaRugiPeriodeIni,
+            $this->totalKewajibanDanEkuitas,
+            $this->startDate,
+            $this->endDate,
+            $namaSekolah
+        ), $fileName);
+    }
+
+    /**
+     * Logika untuk Export PDF
+     */
+    public function exportPdf(): StreamedResponse
+    {
+        // 1. Jalankan filter terlebih dahulu untuk memastikan data terbaru
+        $this->applyFilters();
+
+        // 2. Siapkan data tambahan
+        $namaSekolah = $this->selectedSchool
+            ? School::find($this->selectedSchool)?->name
+            : 'Semua Sekolah (Level Yayasan)';
+
+        $fileName = "laporan_neraca_{$this->startDate}_sd_{$this->endDate}.pdf";
+
+        // 3. Kumpulkan semua data untuk dikirim ke view
+        $data = [
+            'hasilAktiva' => $this->hasilAktiva,
+            'totalAktiva' => $this->totalAktiva,
+            'hasilKewajiban' => $this->hasilKewajiban,
+            'totalKewajiban' => $this->totalKewajiban,
+            'hasilEkuitas' => $this->hasilEkuitas,
+            'totalEkuitas' => $this->totalEkuitas,
+            'labaDitangguhkan' => $this->labaDitangguhkan,
+            'labaRugiPeriodeIni' => $this->labaRugiPeriodeIni,
+            'totalKewajibanDanEkuitas' => $this->totalKewajibanDanEkuitas,
+            'startDate' => $this->startDate,
+            'endDate' => $this->endDate,
+            'namaSekolah' => $namaSekolah,
+        ];
+
+        // 4. Load view dan data menggunakan DOMPDF
+        $pdf = Pdf::loadView('exports.laporan-neraca', $data)
+                   ->setPaper('a4', 'portrait'); // Atur ukuran kertas
+
+        // 5. Kembalikan sebagai streamed response (download)
+        return response()->streamDownload(
+            fn() => print($pdf->output()),
+            $fileName
+        );
     }
 }

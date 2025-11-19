@@ -2,10 +2,13 @@
 
 namespace App\Filament\Yayasan\Pages;
 
+use App\Exports\LaporanRealisasiExport;
 use App\Filament\Traits\HasModuleAccess;
 use App\Models\Budget;
 use App\Models\BudgetItem;
 use App\Models\Department;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Select;
 use Filament\Tables\Contracts\HasTable;
@@ -21,13 +24,15 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use BackedEnum;
+use Maatwebsite\Excel\Facades\Excel; 
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use UnitEnum;
 
 class LaporanRealisasiAnggaran extends Page implements HasForms, HasTable
 {
     use InteractsWithForms, InteractsWithTable, HasModuleAccess;
     protected static string $requiredModule = 'finance';
-    public static function canViewAny(): bool
+    public static function canAccess(): bool // <-- BENAR (Ini untuk Page)
     {
         return static::canAccessWithRolesAndModule(['Admin Yayasan', 'Admin Sekolah']);
     }
@@ -39,6 +44,23 @@ class LaporanRealisasiAnggaran extends Page implements HasForms, HasTable
     protected static ?string $navigationLabel = 'Laporan Realisasi';
     protected static ?int $navigationSort = 1;
     public ?array $data = [];
+
+    protected function getHeaderActions(): array
+    {
+        return [
+            Action::make('exportExcel')
+                ->label('Export Excel')
+                ->icon('heroicon-o-document-arrow-down')
+                ->color('success')
+                ->action('exportExcel'), // Panggil method exportExcel
+
+            Action::make('exportPdf')
+                ->label('Export PDF')
+                ->icon('heroicon-o-document-text')
+                ->color('danger')
+                ->action('exportPdf'), // Panggil method exportPdf
+        ];
+    }
 
     public function mount(): void
     {
@@ -228,5 +250,91 @@ class LaporanRealisasiAnggaran extends Page implements HasForms, HasTable
             //         ]);
             // });
 
+    }
+    private function getExportData(): array
+    {
+        $data = $this->form->getState(); // Ambil data dari form filter
+        $academicYear = $data['academic_year'] ?? null;
+        $departmentId = $data['department_id'] ?? null;
+
+        // Jika tahun ajaran belum dipilih, jangan tampilkan apa-apa
+        if (!$academicYear) {
+            return [
+                'items' => collect(),
+                'academicYear' => $academicYear,
+                'departmentName' => 'N/A',
+            ];
+        }
+        
+        // --- Ini adalah query yang sama persis dari method table() ---
+        $query = BudgetItem::query()
+            ->whereHas('budget', function (Builder $q) use ($academicYear, $departmentId) {
+                $q->where('status', 'APPROVED');
+                if ($academicYear) {
+                    $q->where('academic_year', $academicYear);
+                }
+                if ($departmentId) {
+                    $q->where('department_id', $departmentId);
+                }
+            })
+            ->with('account')
+            ->withSum('expenses', 'amount'); // <-- Ini akan menghasilkan 'expenses_sum_amount'
+        
+        $items = $query->get();
+        // --- Selesai duplikat query ---
+
+        // Ambil data tambahan untuk judul
+        $departmentName = 'Semua Departemen';
+        if ($departmentId) {
+            $departmentName = Department::find($departmentId)?->name ?? 'Semua Departemen';
+        }
+
+        return [
+            'items' => $items,
+            'academicYear' => $academicYear,
+            'departmentName' => $departmentName,
+        ];
+    }
+
+    /**
+     * Logika untuk Export Excel (Maatwebsite)
+     */
+    public function exportExcel()
+    {
+        // 1. Ambil data pakai helper
+        $data = $this->getExportData();
+        
+        // 2. Siapkan nama file
+        $fileName = "laporan_realisasi_anggaran.xlsx";
+
+        // 3. Panggil Maatwebsite Excel untuk download
+        return Excel::download(new LaporanRealisasiExport(
+            $data['items'],
+            $data['academicYear'],
+            $data['departmentName']
+        ), $fileName);
+    }
+
+    /**
+     * Logika untuk Export PDF
+     */
+    public function exportPdf(): StreamedResponse
+    {
+        // 1. Ambil data pakai helper
+        $data = $this->getExportData();
+        
+        // 2. Siapkan nama file
+        $fileName = "laporan_realisasi_anggaran.pdf";
+
+        // 3. Load view dan data menggunakan DOMPDF
+        // Laporan ini lebar, jadi kita pakai 'landscape'
+        $pdf = Pdf::loadView('exports.laporan-realisasi-anggaran', $data)
+                   ->setPaper('a4', 'landscape'); 
+
+        // 4. Kembalikan sebagai streamed response (download)
+        return response()->streamDownload(
+            fn() => print($pdf->output()),
+            $fileName
+        );
     }
 }

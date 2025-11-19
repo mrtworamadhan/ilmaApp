@@ -2,11 +2,14 @@
 
 namespace App\Filament\Yayasan\Widgets;
 
+use App\Filament\Traits\HasModuleAccess;
 use App\Models\Bill;
 use App\Models\Expense;
 use App\Models\Payment;
+use App\Models\School;
 use App\Models\Student;
 use App\Models\Foundation;
+use App\Models\Teacher;
 use Filament\Facades\Filament;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
@@ -16,97 +19,92 @@ use Illuminate\Support\Number;
 
 class DashboardStatsOverview extends BaseWidget
 {
-    // public static function canView(): bool
-    // {
-    //     $tenant = Filament::getTenant();
-    //     // Cek apakah tenant ada DAN modul 'finance' aktif
-    //     return $tenant instanceof Foundation && $tenant->hasModule('finance');
-    // }
+    use HasModuleAccess;
+    protected static string $requiredModule = 'finance';
+    public static function canView(): bool
+    {
+        return static::canAccessWithRolesAndModule(['Admin Yayasan', 'Admin Sekolah']);
+    }
+
     protected static ?int $sort = 1;
     public function getColumns(): int | array
     {
         return 3;
     }
+    protected static bool $isLazy = false; 
 
     protected function getStats(): array
     {
-        $user = Auth::user();
-        $isYayasanUser = $user->school_id === null;
-
-        // --- 1. Query Data Umum ---
-        $siswaQuery = Student::where('status', 'active');
-        $tunggakanQuery = Bill::where('status', 'unpaid');
-        $pemasukanQuery = Payment::where('status', 'success')
-                            ->whereBetween('paid_at', [now()->startOfMonth(), now()->endOfMonth()]);
+        $foundationId = Filament::getTenant()->id;
+        $user = auth()->user();
         
-        if (!$isYayasanUser) {
-            $siswaQuery->where('school_id', $user->school_id);
-            $tunggakanQuery->where('school_id', $user->school_id);
-            $pemasukanQuery->where('school_id', $user->school_id);
-        }
+        $stats = [];
 
-        $totalSiswa = $siswaQuery->count();
-        $totalTunggakan = $tunggakanQuery->sum('amount');
-        $pemasukanBulanIni = $pemasukanQuery->sum('amount_paid');
-
-        // --- 2. Buat Kartu-kartu COMMON (untuk semua admin) ---
-        $stats = [
-            // Stat::make('Total Siswa Aktif', Number::format($totalSiswa))
-            //     ->description('Siswa di sekolah Anda')
-            //     ->descriptionIcon('heroicon-m-users')
-            //     ->color('success'),
-
-            Stat::make('Total Tunggakan', Number::currency($totalTunggakan, 'IDR'))
-                ->description('Total tagihan "unpaid"')
-                ->descriptionIcon('heroicon-m-arrow-trending-down')
-                ->color('danger'),
-
-            Stat::make('Pemasukan Bulan Ini', Number::currency($pemasukanBulanIni, 'IDR'))
-                ->description('Total pembayaran "success" bulan ini')
-                ->descriptionIcon('heroicon-m-arrow-trending-up')
-                ->color('info'),
-        ];
-
-        // --- 3. Buat Kartu-kartu KHUSUS Admin Yayasan ---
-        if ($isYayasanUser) {
+        if ($user->hasRole('Admin Yayasan')) {
+            // ===================================
+            // LOGIKA ADMIN YAYASAN (PER TINGKAT)
+            // ===================================
+            $schools = School::where('foundation_id', $foundationId)->get();
             
-            // a. Hitung Pengeluaran Yayasan
-            $pengeluaranBulanIni = Expense::whereBetween('date', [now()->startOfMonth(), now()->endOfMonth()])
-                                        ->sum('amount');
-            
-            // b. Hitung Siswa per Level
-            $siswaPerLevel = Student::query()
-                ->join('schools', 'students.school_id', '=', 'schools.id')
-                ->where('students.status', 'active')
-                // (Otomatis terfilter by foundation_id/tenant)
-                ->select('schools.level', DB::raw('COUNT(students.id) as total'))
-                ->groupBy('schools.level')
-                ->pluck('total', 'level'); // Hasilnya: ['tk' => 5, 'sd' => 10, 'pondok' => 15]
-
-            // c. Buat kartu dinamis dari hasil query
-            $levelStats = [];
-            // Siapkan kosmetik (sesuai data seeder kita)
-            $levelColors = ['tk' => 'info', 'sd' => 'primary', 'pondok' => 'success'];
-            $levelIcons = ['tk' => 'heroicon-m-sparkles', 'sd' => 'heroicon-m-academic-cap', 'pondok' => 'heroicon-m-building-library'];
-
-            foreach ($siswaPerLevel as $level => $total) {
-                $levelStats[] = Stat::make('Siswa ' . strtoupper($level), Number::format($total))
-                                    ->description('Siswa aktif di tingkat ' . $level)
-                                    ->descriptionIcon($levelIcons[$level] ?? 'heroicon-m-users')
-                                    ->color($levelColors[$level] ?? 'gray');
+            // Stat Siswa per Sekolah (Logika kamu, sudah benar)
+            foreach ($schools as $school) {
+                $stats[] = Stat::make(
+                    "Siswa {$school->name}", // misal: "Siswa TK ILMA"
+                    Student::where('school_id', $school->id)->where('status', 'active')->count()
+                )->icon('heroicon-o-users');
             }
-
-            // d. Tambahkan kartu Pengeluaran
-            $levelStats[] = Stat::make('Pengeluaran Bulan Ini', Number::currency($pengeluaranBulanIni, 'IDR'))
-                                ->description('Total pengeluaran yayasan')
-                                ->descriptionIcon('heroicon-m-arrow-trending-down')
-                                ->color('warning');
             
-            // e. Gabungkan semua kartu Yayasan ke kartu common
-            // (array_merge agar kartu level muncul duluan)
-            $stats = array_merge($levelStats, $stats);
-        }
+            // Stat Guru per Sekolah (Logika kamu, sudah benar)
+            foreach ($schools as $school) {
+                $stats[] = Stat::make(
+                    "Guru {$school->name}", // misal: "Guru TK ILMA"
+                    Teacher::where('school_id', $school->id)->count()
+                )->icon('heroicon-o-academic-cap');
+            }
+            
+            // Stat Tunggakan (Kita tambahkan di level Yayasan)
+            $stats[] = Stat::make('Total Tunggakan (Yayasan)',
+                    Number::currency(
+                        Bill::query()
+                            ->where('foundation_id', $foundationId)
+                            ->whereIn('status', ['unpaid', 'overdue'])
+                            ->sum('total_amount'), // <-- 3. PERBAIKAN
+                        'IDR'
+                    )
+                )
+                ->description('Total tagihan belum lunas di semua sekolah')
+                ->color('danger')
+                ->icon('heroicon-o-currency-dollar');
 
+        } elseif ($user->school_id) {
+            // ===================================
+            // LOGIKA ADMIN SEKOLAH (TOTAL)
+            // ===================================
+            $schoolId = $user->school_id;
+            
+            $stats[] = Stat::make('Total Siswa Aktif (Sekolah Ini)',
+                Student::where('school_id', $schoolId)->where('status', 'active')->count()
+            )->icon('heroicon-o-users');
+            
+            $stats[] = Stat::make('Total Guru Aktif (Sekolah Ini)',
+                Teacher::where('school_id', $schoolId)->where('status', 'active')->count()
+            )->icon('heroicon-o-academic-cap');
+
+            // Stat Tunggakan (Kita tambahkan di level Sekolah)
+            $stats[] = Stat::make('Total Tunggakan (Sekolah Ini)',
+                    Number::currency(
+                        Bill::query()
+                            ->where('school_id', $schoolId) // <-- Filter per sekolah
+                            ->whereIn('status', ['unpaid', 'overdue'])
+                            ->sum('total_amount'), // <-- 3. PERBAIKAN
+                        'IDR'
+                    )
+                )
+                ->description('Total tagihan belum lunas di sekolah ini')
+                ->color('danger')
+                ->icon('heroicon-o-currency-dollar');
+        }
+        
         return $stats;
     }
 }

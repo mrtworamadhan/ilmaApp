@@ -16,6 +16,7 @@ class Expense extends Model
         'school_id',
         'expense_account_id', // Akun Beban
         'cash_account_id',    // Akun Kas/Bank
+        'disbursement_request_id',
         'amount',
         'date',
         'description',
@@ -62,5 +63,9 @@ class Expense extends Model
     public function journal(): MorphOne
     {
         return $this->morphOne(Journal::class, 'referenceable');
+    }
+    public function disbursementRequest(): BelongsTo
+    {
+        return $this->belongsTo(DisbursementRequest::class);
     }
 }

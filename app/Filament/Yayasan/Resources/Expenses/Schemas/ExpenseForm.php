@@ -10,16 +10,21 @@ use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
-use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
+use Filament\Schemas\Schema; // <-- Koreksi 'use'
 use Illuminate\Database\Eloquent\Builder;
 use Filament\Facades\Filament;
-
 class ExpenseForm
 {
     public static function configure(Schema $schema): Schema
     {
         $isYayasanUser = auth()->user()->school_id === null;
         $userSchoolId = auth()->user()->school_id;
+        
+        $tipeBeban = 'Beban'; 
+        $tipeAset = 'Aset'; 
+
         return $schema
             ->components([
                 DatePicker::make('date')
@@ -33,7 +38,6 @@ class ExpenseForm
                     ->numeric()
                     ->prefix('Rp'),
 
-                // 1. Dropdown Sekolah (Hanya untuk Admin Yayasan)
                 Select::make('school_id')
                     ->label('Pengeluaran untuk Sekolah (Opsional)')
                     ->helperText('Kosongkan jika ini pengeluaran level Yayasan')
@@ -45,49 +49,70 @@ class ExpenseForm
                     )
                     ->searchable()
                     ->preload()
-                    ->hidden(!$isYayasanUser), // Sembunyikan jika bukan Admin Yayasan
-
+                    ->hidden(!$isYayasanUser) 
+                    ->disabled(fn (Get $get) => $get('disbursement_request_id') !== null) 
+                    ->dehydrated(),
+                
                 Select::make('disbursement_request_id')
-                    ->label('Terkait Pengajuan Pencairan?')
+                    ->label('Terkait Pengajuan Pencairan? (Opsional)')
                     ->options(
-                        DisbursementRequest::where('status', 'APPROVED') // <-- Hanya tampilkan yg sudah disetujui
-                            ->pluck('id', 'id') // Tampilkan ID atau deskripsi
-                            // Anda bisa kustomisasi format opsi ini
+                        DisbursementRequest::where('status', 'APPROVED')
+                            ->with(['budgetItem.account']) 
+                            ->get()
+                            ->mapWithKeys(function ($request) {
+                                $description = $request->budgetItem?->description 
+                                    ?: "Pengajuan #{$request->id}"; 
+                                
+                                return [
+                                    $request->id => $description
+                                ];
+                            })
                     )
                     ->searchable()
-                    ->nullable(),
-                    // 2. Field Tersembunyi (Hanya untuk Admin Sekolah)
-                Hidden::make('school_id')
-                    ->default($userSchoolId)
-                    ->hidden($isYayasanUser), // Sembunyikan jika Admin Yayasan
-                
-                // 3. Dropdown Akun Beban
+                    ->preload()
+                    ->live() 
+                    ->afterStateUpdated(function (Set $set, ?string $state) {
+                        if (blank($state)) {
+                            $set('expense_account_id', null);
+                            return;
+                        }
+                        
+                        $disbursement = DisbursementRequest::with('budgetItem')
+                                            ->find($state);
+                        
+                        if ($disbursement && $disbursement->budgetItem) {
+                            $set('expense_account_id', $disbursement->budgetItem->account_id);
+                        }
+                    }),
+
                 Select::make('expense_account_id')
                     ->label('Dibebankan ke Akun (Debit)')
                     ->required()
                     ->options(fn () => Account::where('foundation_id', Filament::getTenant()->id)
-                                            // Hanya tampilkan akun BEBAN
-                                            ->where('type', 'beban') 
-                                            ->pluck('name', 'id'))
+                                        ->where('type', $tipeBeban) 
+                                        ->pluck('name', 'id'))
                     ->searchable()
                     ->preload()
-                    ->helperText('Akun pengeluaran, misal: "Beban ATK", "Beban Gaji"'),
+                    ->helperText('Akun pengeluaran, misal: "Beban ATK", "Beban Gaji"')
+                    ->disabled(fn (Get $get) => $get('disbursement_request_id') !== null) 
+                    ->dehydrated(),
 
-                // 4. Dropdown Akun Kas/Bank
                 Select::make('cash_account_id')
                     ->label('Diambil dari Akun (Kredit)')
                     ->required()
                     ->options(fn () => Account::where('foundation_id', Filament::getTenant()->id)
-                                            // Hanya tampilkan akun AKTIVA (Kas/Bank)
-                                            ->where('type', 'aktiva') 
-                                            ->pluck('name', 'id'))
+                                        ->where('type', $tipeAset) 
+                                        ->pluck('name', 'id'))
                     ->searchable()
                     ->preload()
-                    ->helperText('Akun sumber uang, misal: "Kas SD", "Bank Yayasan"'),
+                    ->helperText('Akun sumber uang, misal: "Kas SD", "Bank Yayasan"')
+                    ->disabled(fn (Get $get) => $get('disbursement_request_id') !== null && $get('cash_account_id') !== null)
+                    ->dehydrated(),
 
                 Textarea::make('description')
                     ->label('Keterangan')
                     ->required()
+                    ->dehydrated()
                     ->columnSpanFull(),
                 
                 FileUpload::make('proof_file')

@@ -34,7 +34,7 @@ class AdmissionRegistrationResource extends Resource
     protected static ?int $navigationSort = 2;
 
     protected static ?string $recordTitleAttribute = 'name';
-    public static function canViewAny(): bool
+    public static function canAccess(): bool
     {
         return static::canAccessWithRolesAndModule([
             'Admin Yayasan', 

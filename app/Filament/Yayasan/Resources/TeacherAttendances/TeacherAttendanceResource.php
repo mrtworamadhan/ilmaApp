@@ -30,7 +30,7 @@ class TeacherAttendanceResource extends Resource
     protected static ?string $pluralLabel = 'Log Absensi Guru';
     protected static ?int $navigationSort = 2;
     protected static ?string $recordTitleAttribute = 'name';
-    public static function canViewAny(): bool
+    public static function canAccess(): bool
     {
         // TODO: Tambahkan role 'Staf Kepegawaian' jika sudah dibuat
         return static::canAccessWithRolesAndModule([

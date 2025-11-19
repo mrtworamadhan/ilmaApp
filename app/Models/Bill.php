@@ -2,9 +2,11 @@
 
 namespace App\Models;
 
+use App\Observers\BillObserver;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Bill extends Model
 {
@@ -14,8 +16,9 @@ class Bill extends Model
         'foundation_id',
         'school_id',
         'student_id',
-        'fee_category_id',
-        'amount',
+        // 'fee_category_id',
+        // 'amount',
+        'total_amount',
         'due_date',
         'month',
         'status',
@@ -32,6 +35,12 @@ class Bill extends Model
         return [
             'due_date' => 'date',
         ];
+    }
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::observe(BillObserver::class);
     }
 
     // Relasi ke Yayasan (Tenant)
@@ -53,8 +62,12 @@ class Bill extends Model
     }
 
     // Relasi ke Kategori Biaya
-    public function feeCategory(): BelongsTo
+    // public function feeCategory(): BelongsTo
+    // {
+    //     return $this->belongsTo(FeeCategory::class);
+    // }
+    public function items(): HasMany
     {
-        return $this->belongsTo(FeeCategory::class);
+        return $this->hasMany(BillItem::class);
     }
 }

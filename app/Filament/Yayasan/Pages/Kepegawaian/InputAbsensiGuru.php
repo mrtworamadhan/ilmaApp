@@ -51,7 +51,6 @@ class InputAbsensiGuru extends Page implements HasForms
         return static::canAccessWithRolesAndModule([
             'Admin Yayasan',
             'Admin Sekolah',
-            'Staf Kesiswaan',
         ]);
     }
 

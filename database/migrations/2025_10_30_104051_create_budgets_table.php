@@ -16,7 +16,7 @@ return new class extends Migration
             $table->foreignId('foundation_id')->constrained()->cascadeOnDelete();
             $table->foreignId('department_id')->constrained()->cascadeOnDelete();
             $table->string('academic_year'); // Misal: "2024/2025"
-            $table->string('status')->default('DRAFT'); // Alur kerja: DRAFT, SUBMITTED, APPROVED, REJECTED
+            $table->string('status')->enum('status', ['PENDING', 'APPROVED', 'REJECTED'])->default('PENDING'); // Alur kerja: DRAFT, SUBMITTED, APPROVED, REJECTED
             $table->decimal('total_planned_amount', 15, 2)->default(0); // Total nilai anggaran
             $table->timestamps();
         });

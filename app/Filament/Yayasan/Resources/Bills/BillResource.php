@@ -11,18 +11,23 @@ use App\Filament\Yayasan\Resources\Bills\Tables\BillsTable;
 use App\Models\Bill;
 use Filament\Facades\Filament;
 use BackedEnum;
+use Filament\Schemas\Components\Section;
 use UnitEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Filament\Infolists\Infolist;
+use Filament\Infolists\Components\Section as InfolistSection;
+use Filament\Infolists\Components\RepeatableEntry;
+use Filament\Infolists\Components\TextEntry;
 
 class BillResource extends Resource
 {
     use HasModuleAccess;
     protected static string $requiredModule = 'finance';
-    public static function canViewAny(): bool
+    public static function canAccess(): bool
     {
         return static::canAccessWithRolesAndModule(['Admin Yayasan', 'Admin Sekolah']);
     }
@@ -64,6 +69,28 @@ class BillResource extends Resource
     public static function table(Table $table): Table
     {
         return BillsTable::configure($table);
+    }
+    public static function infolist(Schema  $schema): Schema 
+    {
+        return $schema
+            ->components([
+                Section::make('Rincian Tagihan')
+                    ->schema([
+                        RepeatableEntry::make('items') // <-- Ini relasi 'items()' di Model Bill
+                            ->label(false) // Sembunyikan label repeater
+                            ->schema([
+                                TextEntry::make('description')
+                                    ->label('Item Tagihan')
+                                    ->columnSpan(2),
+                                TextEntry::make('amount')
+                                    ->label('Nominal')
+                                    ->money('IDR')
+                                    ->alignEnd(),
+                            ])
+                            ->columns(3)
+                            ->columnSpanFull()
+                    ])
+            ]);
     }
 
     public static function getRelations(): array

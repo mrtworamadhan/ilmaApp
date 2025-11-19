@@ -6,6 +6,7 @@ use App\Models\Foundation;
 use App\Models\School;
 use App\Models\Pos\Vendor;
 use Filament\Facades\Filament;
+use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
 use Filament\Tenancy\Tenant;
 use Illuminate\Database\Eloquent\Collection;
@@ -16,6 +17,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\HasDatabaseNotifications;
 use Illuminate\Notifications\Notifiable;
 use Filament\Models\Contracts\HasTenants;
 use Illuminate\Support\Facades\Auth;
@@ -26,8 +28,8 @@ use App\Models\Payroll\EmployeePayroll;
 
 class User extends Authenticatable implements HasTenants
 {
-    use HasFactory, Notifiable;
-    use HasRoles;
+    use HasFactory, Notifiable, HasRoles;
+    use HasDatabaseNotifications;
 
     protected $fillable = [
         'name',

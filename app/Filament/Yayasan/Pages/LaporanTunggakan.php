@@ -2,11 +2,14 @@
 
 namespace App\Filament\Yayasan\Pages;
 
+use App\Filament\Exports\TunggakanExporter;
 use App\Filament\Traits\HasModuleAccess;
 use App\Models\Bill;
 use App\Models\School;
 use App\Models\SchoolClass;
 use App\Models\Student;
+use Filament\Actions\ExportAction;
+use Filament\Actions\Exports\Enums\ExportFormat;
 use Filament\Pages\Page;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Schemas\Schema;
@@ -20,7 +23,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\BadgeColumn;
 use Illuminate\Database\Eloquent\Builder;
 use Filament\Facades\Filament;
-use Filament\Tables\Summarizers\Sum;
+use Filament\Tables\Columns\Summarizers\Sum;
 use Filament\Support\Icons\Heroicon;
 use BackedEnum;
 use UnitEnum;
@@ -29,7 +32,7 @@ class LaporanTunggakan extends Page implements HasForms, HasTable
 {
     use InteractsWithForms, InteractsWithTable, HasModuleAccess;
     protected static string $requiredModule = 'finance';
-    public static function canViewAny(): bool
+    public static function canAccess(): bool // <-- BENAR (Ini untuk Page)
     {
         return static::canAccessWithRolesAndModule(['Admin Yayasan', 'Admin Sekolah']);
     }
@@ -41,141 +44,107 @@ class LaporanTunggakan extends Page implements HasForms, HasTable
     protected static ?int $navigationSort = 2;
     protected static ?string $slug = 'laporan/tunggakan';
 
-    // Hapus property individual, gunakan array filters saja
-    public array $filters = [];
+    public ?array $data = []; 
 
     public function mount(): void
     {
-        $userSchoolId = auth()->user()->school_id;
-        $isYayasanUser = auth()->user()->school_id === null;
-        
-        $this->filters = [
-            'selectedSchool' => $isYayasanUser ? null : $userSchoolId,
-            'selectedClass' => null,
-            'selectedStudent' => null,
-        ];
+        $this->resetFilters(); // Panggil resetFilters untuk inisialisasi
+        $this->form->fill($this->data); // Isi form dengan data
     }
 
-    public function filterForm(Schema $form): Schema
+    public function form(Schema $form): Schema
     {
-        $isYayasanUser = auth()->user()->school_id === null;
-        $userSchoolId = auth()->user()->school_id;
-
         return $form
-            ->statePath('filters')
-            ->schema([
+            ->statePath('data') // Gunakan statePath 'data'
+            ->components([
                 Select::make('selectedSchool')
                     ->label('Filter Sekolah')
-                    ->options(
-                        School::where('foundation_id', Filament::getTenant()->id)
-                            ->pluck('name', 'id')
-                    )
-                    ->searchable()
-                    ->live()
-                    ->hidden(!$isYayasanUser)
+                    ->options(fn () => School::where('foundation_id', Filament::getTenant()->id)->pluck('name', 'id'))
                     ->placeholder('Semua Sekolah')
-                    ->afterStateUpdated(function () {
-                        // Reset class dan student ketika school berubah
-                        $this->filters['selectedClass'] = null;
-                        $this->filters['selectedStudent'] = null;
-                    }),
-
+                    ->searchable()
+                    ->hidden(fn () => auth()->user()->school_id !== null) // Sembunyikan jika Admin Sekolah
+                    ->live(), // Buat reaktif
+                
                 Select::make('selectedClass')
                     ->label('Filter Kelas')
                     ->options(function (callable $get) {
-                        $schoolId = $this->getSelectedSchool();
+                        $schoolId = $get('selectedSchool') ?? auth()->user()->school_id;
                         if (!$schoolId) return [];
                         return SchoolClass::where('school_id', $schoolId)->pluck('name', 'id');
                     })
-                    ->searchable()
-                    ->live()
                     ->placeholder('Semua Kelas')
-                    ->afterStateUpdated(function () {
-                        // Reset student ketika class berubah
-                        $this->filters['selectedStudent'] = null;
-                    }),
-
+                    ->searchable()
+                    ->live(), // Buat reaktif
+                
                 Select::make('selectedStudent')
                     ->label('Filter Siswa')
                     ->options(function (callable $get) {
-                        $schoolId = $this->getSelectedSchool();
-                        $classId = $this->filters['selectedClass'] ?? null;
-                        
-                        $query = Student::query()->where('foundation_id', Filament::getTenant()->id);
-                        if ($schoolId) $query->where('school_id', $schoolId);
-                        if ($classId) $query->where('class_id', $classId);
-                        
-                        return $query->pluck('full_name', 'id');
+                        $classId = $get('selectedClass');
+                        if (!$classId) return [];
+                        return Student::where('class_id', $classId)->pluck('name', 'id');
                     })
+                    ->placeholder('Semua Siswa')
                     ->searchable()
-                    ->live()
-                    ->placeholder('Semua Siswa'),
+                    ->live(), // Buat reaktif
             ]);
     }
-
-    // Helper method untuk mendapatkan school ID yang dipilih
-    protected function getSelectedSchool(): ?int
-    {
-        $isYayasanUser = auth()->user()->school_id === null;
-        $userSchoolId = auth()->user()->school_id;
-        
-        return $isYayasanUser 
-            ? ($this->filters['selectedSchool'] ?? null)
-            : $userSchoolId;
-    }
-
+    
     public function table(Table $table): Table
     {
         return $table
             ->query(function (): Builder {
-                // Query dasar adalah Tagihan (Bill)
                 $query = Bill::query()
+                    ->with(['student.schoolClass']) // Eager load
                     ->where('foundation_id', Filament::getTenant()->id)
-                    ->whereIn('status', ['unpaid', 'overdue']);
+                    ->whereIn('status', ['unpaid', 'overdue']); // Hanya ambil yg belum lunas
 
-                // --- Terapkan Filter Keamanan ---
+                // Ambil filter dari state 'data'
+                $filters = $this->data;
                 $userSchoolId = auth()->user()->school_id;
+
                 if ($userSchoolId) {
+                    // Admin Sekolah hanya lihat sekolahnya
                     $query->where('school_id', $userSchoolId);
+                } elseif (!empty($filters['selectedSchool'])) {
+                    // Admin Yayasan memfilter
+                    $query->where('school_id', $filters['selectedSchool']);
                 }
 
-                // --- Terapkan Filter Form ---
-                $selectedSchool = $this->getSelectedSchool();
-                $selectedClass = $this->filters['selectedClass'] ?? null;
-                $selectedStudent = $this->filters['selectedStudent'] ?? null;
-                
-                $query->when($selectedSchool, function ($q) use ($selectedSchool) {
-                    return $q->where('school_id', $selectedSchool);
-                });
-                
-                $query->when($selectedClass, function ($q) use ($selectedClass) {
-                    return $q->whereHas('student', fn($sq) => $sq->where('class_id', $selectedClass));
-                });
-                
-                $query->when($selectedStudent, function ($q) use ($selectedStudent) {
-                    return $q->where('student_id', $selectedStudent);
-                });
+                if (!empty($filters['selectedClass'])) {
+                    $query->whereHas('student', fn (Builder $q) => $q->where('class_id', $filters['selectedClass']));
+                }
 
-                return $query->orderBy('due_date', 'asc');
+                if (!empty($filters['selectedStudent'])) {
+                    $query->where('student_id', $filters['selectedStudent']);
+                }
+
+                return $query->orderBy('due_date', 'asc')->orderBy('id', 'asc');
             })
             ->columns([
                 TextColumn::make('student.full_name')
-                    ->label('Nama Siswa')
-                    ->searchable(),
+                    ->label('Siswa')
+                    ->searchable()
+                    ->sortable(),
                 
                 TextColumn::make('student.schoolClass.name')
                     ->label('Kelas')
                     ->badge(),
                 
-                TextColumn::make('feeCategory.name')
-                    ->label('Tagihan Untuk')
+                // ===================================================
+                // PERBAIKAN 1: Ganti 'feeCategory.name'
+                // ===================================================
+                TextColumn::make('description')
+                    ->label('Keterangan Tagihan')
                     ->badge(),
                 
-                TextColumn::make('amount')
+                // ===================================================
+                // PERBAIKAN 2 & 3: Ganti 'amount' ke 'total_amount'
+                // ===================================================
+                TextColumn::make('total_amount') // <-- Perbaikan 2
                     ->label('Nominal')
                     ->money('IDR')
                     ->sortable()
-                    ->summarize(\Filament\Tables\Columns\Summarizers\Sum::make()->label('Total Tunggakan')->money('IDR')),
+                    ->summarize(Sum::make('total_amount')->label('Total Tunggakan')->money('IDR')), // <-- Perbaikan 3
 
                 TextColumn::make('due_date')
                     ->label('Jatuh Tempo')
@@ -189,6 +158,15 @@ class LaporanTunggakan extends Page implements HasForms, HasTable
                         'overdue' => 'danger',
                         default => 'gray',
                     }),
+            ])
+            ->headerActions([
+                ExportAction::make()
+                    ->label('Export ke Excel')
+                    ->exporter(TunggakanExporter::class)
+                    ->formats([
+                            ExportFormat::Xlsx,
+                        ])
+                    
             ]);
     }
 
@@ -198,10 +176,13 @@ class LaporanTunggakan extends Page implements HasForms, HasTable
         $userSchoolId = auth()->user()->school_id;
         $isYayasanUser = auth()->user()->school_id === null;
         
-        $this->filters = [
+        $this->data = [
             'selectedSchool' => $isYayasanUser ? null : $userSchoolId,
             'selectedClass' => null,
             'selectedStudent' => null,
         ];
+        
+        // Reset form juga
+        $this->form->fill($this->data);
     }
 }

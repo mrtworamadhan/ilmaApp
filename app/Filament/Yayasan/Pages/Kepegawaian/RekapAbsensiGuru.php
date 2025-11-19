@@ -52,8 +52,6 @@ class RekapAbsensiGuru extends Page implements HasForms, HasTable
         return static::canAccessWithRolesAndModule([
             'Admin Yayasan', 
             'Admin Sekolah',
-            'Staf Kesiswaan',
-            'Wali Kelas',
         ]);
     }
 

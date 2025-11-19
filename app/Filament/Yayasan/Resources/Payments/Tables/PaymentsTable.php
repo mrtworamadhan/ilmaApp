@@ -19,7 +19,7 @@ class PaymentsTable
 
         return $table
             ->columns([
-                TextColumn::make('student.name')
+                TextColumn::make('student.full_name')
                     ->label('Nama Siswa')
                     ->searchable(),
                 

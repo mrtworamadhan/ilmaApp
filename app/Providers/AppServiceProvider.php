@@ -3,10 +3,12 @@
 namespace App\Providers;
 
 use App\Models\Expense;
+use App\Models\Foundation;
 use App\Models\Payment;
 use App\Models\Student;
 use App\Models\Budget;
 use App\Models\DisbursementRequest;
+use App\Observers\FoundationObserver;
 use App\Policies\BudgetPolicy;
 use App\Policies\DisbursementRequestPolicy;
 use App\Observers\DisbursementRequestObserver;
@@ -56,6 +58,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(DisbursementRequest::class, DisbursementRequestPolicy::class);
 
         // 3. OBSERVER ANDA SUDAH BENAR DI SINI
+        Foundation::observe(FoundationObserver::class);
         Payment::observe(PaymentObserver::class);
         Expense::observe(ExpenseObserver::class);
         Student::observe(StudentObserver::class);

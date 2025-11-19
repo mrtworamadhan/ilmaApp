@@ -4,7 +4,7 @@ namespace App\Observers;
 
 use App\Models\Account;
 use App\Models\Journal;
-use App\Models\JournalEntry; // <-- 1. PASTIKAN IMPORT INI ADA
+use App\Models\JournalEntry;
 use App\Models\SavingAccount;
 use App\Models\SavingTransaction;
 use Illuminate\Support\Facades\DB;
@@ -23,40 +23,55 @@ class SavingTransactionObserver
                 // 1. UPDATE SALDO BUKU TABUNGAN
                 $savingAccount = $transaction->savingAccount;
 
-                // FIX #1: Cek pakai 'kredit' (lowercase)
-                if ($transaction->type === 'kredit') { 
+                if ($transaction->type === 'kredit') { // 'kredit' (Menabung)
                     $savingAccount->increment('balance', $transaction->amount);
                 } 
-                // FIX #2: Cek pakai 'debit' (lowercase)
-                elseif ($transaction->type === 'debit') { 
+                elseif ($transaction->type === 'debit') { // 'debit' (Tarik/Belanja)
                     $savingAccount->decrement('balance', $transaction->amount);
                 }
 
                 
-                // 2. BUAT JURNAL
+                // 2. BUAT JURNAL (Jika Modul Finance Aktif)
                 if ($transaction->foundation->hasModule('finance')) {
+
+                    // ========================================================
+                    // REFACTOR DIMULAI DI SINI
+                    // ========================================================
+
+                    // Ganti pencarian 'code' menjadi 'system_code'
                     $akunKasTabungan = Account::where('foundation_id', $transaction->foundation_id)
-                                    ->where('code', '1105') // Kas Tabungan
-                                    ->firstOrFail();
+                                    ->where('system_code', 'kas_tabungan_siswa') // <-- REFACTOR
+                                    ->first();
                                     
                     $akunUtangTabungan = Account::where('foundation_id', $transaction->foundation_id)
-                                            ->where('code', '2102') // Utang Tabungan Siswa
-                                            ->firstOrFail();
+                                            ->where('system_code', 'utang_tabungan_siswa') // <-- REFACTOR
+                                            ->first();
+
+                    // Guard clause jika akun sistem tidak ditemukan
+                    if (!$akunKasTabungan || !$akunUtangTabungan) {
+                        Log::error("Akun sistem tabungan (kas_tabungan_siswa / utang_tabungan_siswa) tidak ditemukan untuk Foundation ID: {$transaction->foundation_id}. Jurnal DIBATALKAN.");
+                        // Batalkan transaksi DB agar saldo tidak terupdate
+                        throw new \Exception("Akun sistem tabungan tidak ditemukan."); 
+                    }
+
+                    // ========================================================
+                    // REFACTOR SELESAI
+                    // ========================================================
 
                     $debitAccountId = null;
                     $creditAccountId = null;
                     
-                    if ($transaction->type === 'kredit') {
+                    if ($transaction->type === 'kredit') { // Menabung
+                        // Uang (Aset) bertambah di 'Kas Tabungan Siswa'
                         $debitAccountId = $akunKasTabungan->id;
+                        // Utang (Liabilitas) bertambah di 'Utang Tabungan Siswa'
                         $creditAccountId = $akunUtangTabungan->id;
-                    } elseif ($transaction->type === 'debit') {
+                    } elseif ($transaction->type === 'debit') { // Tarik/Belanja
+                        // Utang (Liabilitas) berkurang di 'Utang Tabungan Siswa'
                         $debitAccountId = $akunUtangTabungan->id;
+                        // Uang (Aset) berkurang di 'Kas Tabungan Siswa'
                         $creditAccountId = $akunKasTabungan->id;
                     }
-
-                    // Jika $debitAccountId masih null (karena type tidak dikenal), 
-                    // firstOrFail() di bawah akan gagal dan memicu catch, 
-                    // yang mana itu perilaku yg benar.
 
                     $journal = Journal::create([
                         'foundation_id' => $transaction->foundation_id,
@@ -78,25 +93,24 @@ class SavingTransactionObserver
                     // Entry Sisi KREDIT
                     $journal->entries()->create([
                         'account_id' => $creditAccountId,
-                        'type' => 'kredit', // FIX #3: Pastikan ini 'kredit' (Bahasa), BUKAN 'credit'
+                        'type' => 'kredit',
                         'amount' => $transaction->amount,
                     ]);
                 }
             });
         } catch (\Exception $e) {
             Log::error("Gagal memproses SavingTransaction Observer (ID: {$transaction->id}): " . $e->getMessage());
+            // Lemparkan kembali error agar DB::transaction() di-rollback
             throw $e; 
         }
     }
 
     /**
      * Handle the SavingTransaction "deleted" event.
-     * (PENTING: Kita juga harus handle jika transaksi dibatalkan/dihapus)
      */
     public function deleted(SavingTransaction $transaction): void
     {
         // TODO: Buat logika untuk membatalkan (rollback) saldo dan jurnal
         //       jika sebuah SavingTransaction dihapus.
-        //       Untuk saat ini, kita fokus di 'created'.
     }
 }

@@ -7,6 +7,12 @@ use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
+use Filament\Infolists\Components\RepeatableEntry;
+use Filament\Infolists\Components\TextEntry;
+use Filament\Schemas\Components\Component;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
@@ -28,11 +34,11 @@ class BillsTable
                     ->badge()
                     ->hidden(!$isYayasanUser), // Sembunyikan jika Admin Sekolah
                 
-                TextColumn::make('feeCategory.name')
-                    ->label('Kategori Tagihan')
-                    ->badge(),
+                TextColumn::make('description')
+                    ->label('Keterangan')
+                    ->searchable(),
                 
-                TextColumn::make('amount')
+                TextColumn::make('total_amount')
                     ->label('Nominal')
                     ->money('IDR')
                     ->sortable(),
@@ -88,6 +94,7 @@ class BillsTable
             ->recordActions([
                 EditAction::make(),
                 DeleteAction::make(),
+                ViewAction::make(),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
@@ -95,4 +102,5 @@ class BillsTable
                 ]),
             ]);
     }
+
 }

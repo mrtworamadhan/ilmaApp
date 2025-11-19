@@ -71,7 +71,7 @@ class XenditWebhookController extends Controller
 
             Log::info('👤 Student ditemukan:', [
                 'student_id' => $student->id,
-                'student_name' => $student->name,
+                'student_name' => $student->full_name,
                 'va_number' => $vaNumber
             ]);
 

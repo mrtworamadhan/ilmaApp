@@ -70,10 +70,10 @@ class Student extends Model
     {
         return $this->belongsTo(User::class, 'parent_id');
     }
-    public function optionalFees(): BelongsToMany
-    {
-        return $this->belongsToMany(FeeStructure::class, 'student_optional_fees');
-    }
+    // public function optionalFees(): BelongsToMany
+    // {
+    //     return $this->belongsToMany(FeeStructure::class, 'student_optional_fees');
+    // }
     public function savingAccount(): HasOne
     {
         return $this->hasOne(SavingAccount::class);
@@ -92,5 +92,14 @@ class Student extends Model
     {
         return $this->hasOne(StudentAttendance::class)
                     ->whereDate('date', Carbon::today());
+    }
+    public function optionalFees(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            FeeStructure::class,       // <-- 2a. Ganti ke FeeStructure
+            'student_optional_fees', // Nama tabel pivot
+            'student_id',
+            'fee_structure_id'       // <-- 2b. Ganti ke fee_structure_id
+        );
     }
 }

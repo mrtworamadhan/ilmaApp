@@ -12,13 +12,16 @@ use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Components\Wizard;
 use Filament\Schemas\Components\Wizard\Step;
 use Filament\Schemas\Schema;
+use Filament\Support\RawJs;
 use Illuminate\Database\Eloquent\Builder;
 use Filament\Facades\Filament;
+use Illuminate\Support\Facades\Auth;
 
 class BudgetForm
 {
     public static function configure(Schema $schema): Schema
     {
+        $foundationId = Auth::user()->foundation_id;
         return $schema
             ->components([
                 Wizard::make([
@@ -28,16 +31,13 @@ class BudgetForm
                                 ->relationship(
                                     name: 'department', 
                                     titleAttribute: 'name',
-                                    // 'Query ribet' ini WAJIB untuk memfilter list
                                     modifyQueryUsing: function (Builder $query) { 
                                         $user = auth()->user();
                                         $tenant = Filament::getTenant();
 
                                         $query->where('foundation_id', $tenant->id);
 
-                                        // Jika user adalah Admin Sekolah (bukan Yayasan)
                                         if ($user->school_id !== null) {
-                                            // Filter hanya untuk departemen sekolahnya
                                             $query->where('school_id', $user->school_id);
                                         }
                                         
@@ -53,10 +53,38 @@ class BudgetForm
                                 ->placeholder('Contoh: 2024/2025')
                                 ->required(),
                         ]),
-
-                    Step::make('Rincian Anggaran')
+                    Step::make('Akuntansi Dana Terikat (Opsional)')
+                        ->description('Isi bagian ini HANYA jika ini adalah anggaran untuk dana terikat (misal: Dana BOS, Wakaf).')
+                        
                         ->schema([
-                            Repeater::make('items') // <-- Nama relasi 'items'
+                            Select::make('cash_source_account_id')
+                                ->label('Sumber Kas/Bank Terikat')
+                                ->helperText('Pilih rekening bank spesifik tempat dana ini disimpan.')
+                                ->options(
+                                    Account::where('foundation_id', $foundationId)
+                                        ->where('type', 'Aset') // Filter hanya Kas/Bank
+                                        ->pluck('name', 'id')
+                                )
+                                ->searchable()
+                                ->preload()
+                                ->nullable(),
+
+                            Select::make('restricted_fund_account_id')
+                                ->label('Map ke Aset Neto Terikat')
+                                ->helperText('Pilih "amplop" dana terikat yang sesuai.')
+                                ->options(
+                                    Account::where('foundation_id', $foundationId)
+                                        ->where('type', 'Aset Neto') // Filter hanya Aset Neto
+                                        ->where('name', 'like', '%Terikat%') // Tampilkan yg terikat saja
+                                        ->pluck('name', 'id')
+                                )
+                                ->searchable()
+                                ->preload()
+                                ->nullable(), // Boleh kosong
+                        ])->columns(2),
+                    Step::make('Rincian Anggaran (POS)')
+                        ->schema([
+                            Repeater::make('items')
                                 ->relationship()
                                 ->label('Rincian Pos Anggaran')
                                 ->schema([
@@ -64,19 +92,34 @@ class BudgetForm
                                         ->label('Mata Anggaran (COA)')
                                         ->options(Account::where('type', 'beban')->pluck('name', 'id')) // <-- HANYA ambil akun BEBAN
                                         ->searchable()
-                                        ->required(),
+                                        ->required()
+                                        ->columnSpan(2),
+                                    Select::make('account_id')
+                                        ->label('Map ke Akun (COA)')
+                                        ->options(function () {
+                                            return Account::where('foundation_id', Auth::user()->foundation_id)
+                                                        ->where('type', 'Beban')
+                                                        ->pluck('name', 'id');
+                                        })
+                                        ->searchable()
+                                        ->preload()
+                                        ->placeholder('Pilih Akun Beban Terkait')
+                                        ->required()
+                                        ->columnSpan(1),
                                     TextInput::make('description')
                                         ->label('Deskripsi')
                                         ->required(),
                                     TextInput::make('planned_amount')
                                         ->label('Jumlah Dianggarkan')
                                         ->numeric()
+                                        ->mask(RawJs::make('$money($input)'))
+                                        ->stripCharacters(',')
                                         ->prefix('Rp')
-                                        ->required(),
+                                        ->required()
+                                        ->columnSpan(1),
                                 ])
-                                ->columns(3)
+                                ->columns(2)
                                 ->live()
-                                // Hitung total otomatis
                                 ->afterStateUpdated(function (Get $get, Set $set) {
                                     self::updateTotal($get, $set);
                                 })
@@ -89,18 +132,25 @@ class BudgetForm
                 TextInput::make('total_planned_amount')
                     ->label('Total Anggaran')
                     ->numeric()
+                    ->mask(RawJs::make('$money($input)'))
+                    ->stripCharacters(',')
                     ->prefix('Rp')
-                    ->readOnly(), // <-- Readonly, diisi oleh Repeater
+                    ->readOnly(),
             ]);
     }
     public static function updateTotal(Get $get, Set $set): void
     {
-        $items = $get('items'); // Ambil semua item dari repeater
+        $items = $get('items'); 
         $total = 0;
 
         if (is_array($items)) {
             foreach ($items as $item) {
-                $total += floatval($item['planned_amount'] ?? 0);
+                $amount = $item['planned_amount'] ?? '0';
+            
+                $cleanAmount = preg_replace('/[^\d.]/', '', $amount);
+                $cleanAmount = floatval($cleanAmount);
+                
+                $total += $cleanAmount;
             }
         }
 

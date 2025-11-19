@@ -2,6 +2,15 @@
 
 namespace App\Filament\Yayasan\Resources\DisbursementRequests\Schemas;
 
+// 1. TAMBAHKAN USE STATEMENTS INI
+use App\Models\BudgetItem;
+
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
+use Filament\Support\RawJs;
+use Illuminate\Support\Number;
+// --------------------------
+
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -15,30 +24,30 @@ class DisbursementRequestForm
     {
         return $schema
             ->components([
+                
                 Select::make('budget_item_id')
                     ->label('Pilih Pos Anggaran')
                     ->relationship(
                         name: 'budgetItem',
-                        titleAttribute: 'description',
-                        // Tambahkan 'modifyQueryUsing' untuk memfilter
+                        // 2. Koreksi: 'titleAttribute' dari migrasi adalah 'description'
+                        // (Nama di migrasi: $table->string('description');)
+                        titleAttribute: 'description', 
+                        
+                        // ===================================================
+                        // LOGIKA QUERY ASLI ANDA YANG SUDAH BENAR 100%
+                        // ===================================================
                         modifyQueryUsing: function (Builder $query) {
                             $user = Auth::user();
                             
-                            // 1. Jika user tidak punya departemen (Admin Yayasan/Sekolah)
-                            // Tampilkan semua pos anggaran yang SUDAH DISETUJUI
                             if (is_null($user->department_id)) {
                                 return $query->whereHas('budget', function (Builder $q) use ($user) {
                                     $q->where('status', 'APPROVED');
-                                    // Jika Admin Sekolah, filter lg by school_id
                                     if ($user->school_id) {
                                         $q->whereHas('department', fn(Builder $dq) => $dq->where('school_id', $user->school_id));
                                     }
                                 });
                             }
                             
-                            // 2. Jika user adalah Kepala Bagian (punya departemen)
-                            // Tampilkan HANYA pos anggaran dari departemennya
-                            // DAN yang status budget-nya sudah 'APPROVED'.
                             return $query->whereHas('budget', function (Builder $q) use ($user) {
                                 $q->where('department_id', $user->department_id)
                                   ->where('status', 'APPROVED');
@@ -46,17 +55,66 @@ class DisbursementRequestForm
                         }
                     )
                     ->searchable()
-                    ->preload() // <-- Tambahkan preload
+                    ->preload() 
                     ->required()
+                    ->hiddenOn('edit')
+                    
+                    // 3. TAMBAHKAN live() agar reactive
+                    ->live() 
+                    
+                    // 4. TAMBAHKAN afterStateUpdated dengan LOGIKA YANG BENAR
+                    ->afterStateUpdated(function (Get $get, Set $set, ?string $state) {
+                        if (blank($state)) {
+                            $set('budget_available', 0);
+                            return;
+                        }
+                        
+                        // Eager load relasi 'expenses'
+                        $budgetItem = BudgetItem::with('expenses')->find($state);
+                        if (!$budgetItem) {
+                            $set('budget_available', 0);
+                            return;
+                        }
+
+                        // INI QUERY YANG BENAR (SESUAI MODEL ANDA)
+                        $totalBudget = $budgetItem->planned_amount;
+                        // Menjalankan relasi 'expenses' dan menjumlahkan 'amount'
+                        $totalRealisasi = $budgetItem->expenses->sum('amount'); 
+                        
+                        $sisaBudget = $totalBudget - $totalRealisasi;
+                        
+                        $set('budget_available', $sisaBudget);
+                    }),
+                
+                // 5. TAMBAHKAN Field Read-Only untuk Sisa Anggaran
+                TextInput::make('budget_available')
+                    ->label('Sisa Anggaran yang Tersedia')
+                    ->mask(RawJs::make('$money($input)'))
+                    ->stripCharacters(',')
+                    ->prefix('Rp')
+                    ->numeric()
+                    ->formatStateUsing(fn (?string $state) => Number::format($state ?? 0, 0, 0, 'id'))
+                    ->disabled() 
+                    ->dehydrated(false)
                     ->hiddenOn('edit'),
+
                 TextInput::make('requested_amount')
                     ->label('Jumlah Diajukan')
                     ->numeric()
+                    ->mask(RawJs::make('$money($input)'))
+                    ->stripCharacters(',')
                     ->prefix('Rp')
                     ->required()
-                    ->hiddenOn('edit'),
+                    ->hiddenOn('edit')
+                    
+                    // 6. TAMBAHKAN Validasi maxValue
+                    ->maxValue(function (Get $get) {
+                        $sisa = $get('budget_available');
+                        return $sisa > 0 ? $sisa : 0; 
+                    })
+                    ->helperText('Jumlah tidak boleh melebihi Sisa Anggaran.'),
 
-                // Nanti, Bendahara akan isi ini:
+                // Field Anda sebelumnya (tetap ada)
                 FileUpload::make('realization_attachment')
                     ->label('Upload Nota / Laporan Realisasi')
                     ->directory('realisasi')
@@ -65,6 +123,8 @@ class DisbursementRequestForm
                 TextInput::make('realization_amount')
                     ->label('Jumlah Realisasi (sesuai nota)')
                     ->numeric()
+                    ->mask(RawJs::make('$money($input)'))
+                    ->stripCharacters(',')
                     ->prefix('Rp')
                     ->nullable()
                     ->visibleOn('edit'),

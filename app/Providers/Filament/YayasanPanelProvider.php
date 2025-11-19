@@ -3,6 +3,18 @@
 namespace App\Providers\Filament;
 
 // Model & Fasade
+use App\Filament\Yayasan\Resources\AdmissionBatches\AdmissionBatchResource;
+use App\Filament\Yayasan\Resources\AdmissionBatches\Tables\AdmissionBatchesTable;
+use App\Filament\Yayasan\Resources\AdmissionRegistrations\AdmissionRegistrationResource;
+use App\Filament\Yayasan\Resources\Announcements\AnnouncementResource;
+use App\Filament\Yayasan\Resources\Payroll\Payslips\PayslipResource;
+use App\Filament\Yayasan\Resources\PayrollComponents\PayrollComponentResource;
+use App\Filament\Yayasan\Resources\StudentAttendances\StudentAttendanceResource;
+use App\Filament\Yayasan\Resources\StudentRecords\StudentRecordResource;
+use App\Filament\Yayasan\Resources\TeacherAttendances\TeacherAttendanceResource;
+use App\Filament\Yayasan\Resources\Teachers\TeacherResource;
+use App\Filament\Yayasan\Resources\VendorDisbursements\VendorDisbursementResource;
+use App\Filament\Yayasan\Resources\Vendors\VendorResource;
 use App\Models\Foundation;
 use Filament\Facades\Filament;
 use Filament\Pages\Dashboard;
@@ -90,7 +102,7 @@ class YayasanPanelProvider extends PanelProvider
             ])
             ->authMiddleware([
                 Authenticate::class,
-                'role:Admin Yayasan|Admin Sekolah|Staf|Guru|Staf Kesiswaan|Wali Kelas', // Pastikan HANYA role ini yg boleh masuk
+                'role:Admin Yayasan|Admin Sekolah|Staf|Guru|Staf Kesiswaan|Wali Kelas|Kepala Bagian', // Pastikan HANYA role ini yg boleh masuk
             ])
             
             ->tenant(
@@ -98,30 +110,32 @@ class YayasanPanelProvider extends PanelProvider
                 slugAttribute: 'name',
                 ownershipRelationship: 'foundation'
             )
-            ->discoverResources(in: app_path('Filament/Yayasan/Resources'), for: 'App\Filament\Yayasan\Resources')
+            // ->discoverResources(in: app_path('Filament/Yayasan/Resources'), for: 'App\Filament\Yayasan\Resources')
             ->discoverPages(in: app_path('Filament/Yayasan/Pages'), for: 'App\Filament\Yayasan\Pages')
-            ->discoverWidgets(in: app_path('Filament/Yayasan/Widgets'), for: 'App\Filament\Yayasan\Widgets')
+            // ->discoverWidgets(in: app_path('Filament/Yayasan/Widgets'), for: 'App\Filament\Yayasan\Widgets')
             
-            ->navigationGroups([
-                NavigationGroup::make('Pengaturan')
-                    ->label('Pengaturan'),
-                NavigationGroup::make('Data Master')
-                    ->label('Data Master'),
-                NavigationGroup::make('Kesiswaan')
-                    ->label('Kesiswaan'), 
-                NavigationGroup::make('Kepegawaian')
-                    ->label('Kepegawaian'),
-                NavigationGroup::make('Manajemen Keuangan')
-                    ->label('Keuangan'), 
-                NavigationGroup::make('Tabungan')
-                    ->label('Tabungan'), 
-                NavigationGroup::make('Akuntansi')
-                    ->label('Akuntansi'), 
-                NavigationGroup::make('Anggaran')
-                    ->label('Anggaran'), 
-                NavigationGroup::make('Laporan')
-                    ->label('Laporan'), 
-            ])
+            // ->navigationGroups([
+            //     NavigationGroup::make('Pengaturan')
+            //         ->label('Pengaturan'),
+            //     NavigationGroup::make('Data Master')
+            //         ->label('Data Master'),
+            //     NavigationGroup::make('Kesiswaan')
+            //         ->label('Kesiswaan'), 
+            //     NavigationGroup::make('Kepegawaian')
+            //         ->label('Kepegawaian'),
+            //     NavigationGroup::make('Manajemen Keuangan')
+            //         ->label('Keuangan'), 
+            //     NavigationGroup::make('Tabungan')
+            //         ->label('Tabungan'), 
+            //     NavigationGroup::make('Akuntansi')
+            //         ->label('Akuntansi'), 
+            //     NavigationGroup::make('Anggaran')
+            //         ->label('Anggaran'), 
+            //     NavigationGroup::make('Laporan')
+            //         ->label('Laporan'),
+            //     NavigationGroup::make('Laporan')
+            //         ->label('Laporan'), 
+            // ])
 
             ->resources([
                 // Default
@@ -130,7 +144,7 @@ class YayasanPanelProvider extends PanelProvider
                 DepartmentResource::class,
                 SchoolClassResource::class,
                 StudentResource::class,
-                RoleResource::class,
+                // RoleResource::class,
 
                 // Keuangan
                 AccountResource::class,
@@ -148,6 +162,29 @@ class YayasanPanelProvider extends PanelProvider
                 // Tabungan (terpisah)
                 SavingAccountResource::class,
                 SavingTransactionResource::class,
+
+                //kepegawaian
+                TeacherResource::class,
+                TeacherAttendanceResource::class,
+                //Payroll
+                PayrollComponentResource::class,
+                PayslipResource::class,
+
+                //ppdb
+                AdmissionRegistrationResource::class,
+                AdmissionBatchResource::class,
+
+                //Broadcast
+                AnnouncementResource::class,
+
+                //Kesiswaan
+                StudentAttendanceResource::class,
+                StudentRecordResource::class,
+
+                //VendorKantin
+                VendorDisbursementResource::class,
+                VendorResource::class,
+
             ])
             
             ->pages([
@@ -160,16 +197,15 @@ class YayasanPanelProvider extends PanelProvider
             ])
             
             ->widgets([
-                // Widget Default (selalu ada)
                 DashboardStatsOverview::class,
                 Widgets\AccountWidget::class,
-                // Widgets\FilamentInfoWidget::class,
-            
-                // Widget Keuangan (juga daftarkan statis)
+
                 DashboardFinancialOverview::class,
                 PemasukanPengeluaranChart::class,
             ])
             // ->active(Dashboard::class)
-            ->sidebarCollapsibleOnDesktop();
+            ->sidebarCollapsibleOnDesktop()
+            ->databaseNotifications()
+            ->databaseNotificationsPolling('30s');
     }
 }

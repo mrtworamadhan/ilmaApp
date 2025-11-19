@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -11,10 +10,11 @@ use App\Models\Pos\Product;
 use App\Models\Pos\SaleTransaction;
 use App\Models\Pos\Vendor;
 use App\Models\Pos\VendorLedger;
+use Illuminate\Support\Str;
 
 class School extends Model
 {
-    use HasFactory, HasUuids;
+    use HasFactory; // HAPUS: HasUuids
 
     protected $fillable = [
         'foundation_id',
@@ -28,6 +28,18 @@ class School extends Model
         'teacher_check_in_time',
         'teacher_check_out_time',
     ];
+
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($model) {
+            if (empty($model->uuid)) {
+                $model->uuid = Str::uuid()->toString();
+            }
+        });
+    }
+
     public function getRouteKeyName()
     {
         return 'uuid';
@@ -49,8 +61,9 @@ class School extends Model
 
     public function classes(): HasMany
     {
-        return $this->hasMany(Department::class);
+        return $this->hasMany(Department::class); // NOTE: Ini mungkin salah, harusnya SchoolClass?
     }
+    
     public function admissionBatches(): HasMany
     {
         return $this->hasMany(AdmissionBatch::class);
@@ -63,6 +76,7 @@ class School extends Model
     {
         return $this->hasMany(AdmissionRegistration::class);
     }
+    
     public function teacherAttendances(): HasMany
     {
         return $this->hasMany(TeacherAttendance::class);
@@ -96,5 +110,4 @@ class School extends Model
     {
         return $this->hasMany(VendorLedger::class);
     }
-
 }

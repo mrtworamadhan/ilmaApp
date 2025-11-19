@@ -62,7 +62,7 @@ class BudgetPolicy
      */
     public function update(User $user, Budget $budget): bool
     {
-        if ($budget->status !== 'DRAFT') {
+        if ($budget->status !== 'PENDING') {
             return false; // Jika sudah di-submit, tidak bisa diedit
         }
 
@@ -82,7 +82,7 @@ class BudgetPolicy
      */
     public function delete(User $user, Budget $budget): bool
     {
-        return $user->hasRole('Admin Sekolah') && $budget->status === 'DRAFT';
+        return $user->hasRole('Admin Sekolah') && $budget->status === 'PENDING';
     }
 
 }

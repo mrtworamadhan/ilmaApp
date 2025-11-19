@@ -50,9 +50,18 @@ class Journal extends Model
         return $this->morphTo();
     }
 
-    // 1 Jurnal punya BANYAK Entri (Debit/Kredit)
     public function entries(): HasMany
     {
         return $this->hasMany(JournalEntry::class);
+    }
+
+    public function debitEntries(): HasMany
+    {
+        return $this->hasMany(JournalEntry::class)->where('type', 'debit');
+    }
+    
+    public function creditEntries(): HasMany
+    {
+        return $this->hasMany(JournalEntry::class)->where('type', 'credit');
     }
 }

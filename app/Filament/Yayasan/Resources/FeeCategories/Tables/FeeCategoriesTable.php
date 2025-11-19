@@ -5,7 +5,9 @@ namespace App\Filament\Yayasan\Resources\FeeCategories\Tables;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Forms\Components\ToggleButtons;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\ToggleColumn;
 use Filament\Tables\Table;
 
 class FeeCategoriesTable
@@ -22,6 +24,10 @@ class FeeCategoriesTable
                 TextColumn::make('account.name')
                     ->label('Akun Pendapatan')
                     ->badge(),
+                
+                ToggleColumn::make('is_optional')
+                    ->label('Opsional'),
+
             ])
             ->filters([
                 //

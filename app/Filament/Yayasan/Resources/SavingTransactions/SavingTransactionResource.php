@@ -22,7 +22,7 @@ class SavingTransactionResource extends Resource
 {
     use HasModuleAccess;
     protected static string $requiredModule = 'savings';
-    public static function canViewAny(): bool
+    public static function canAccess(): bool
     {
         return static::canAccessWithRolesAndModule(['Admin Yayasan', 'Admin Sekolah']);
     }

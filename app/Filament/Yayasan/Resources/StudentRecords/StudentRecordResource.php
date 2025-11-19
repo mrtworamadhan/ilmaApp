@@ -34,7 +34,7 @@ class StudentRecordResource extends Resource
     protected static ?string $recordTitleAttribute = 'name';
     protected static ?string $label = 'Catatan Siswa';
     protected static ?string $pluralLabel = 'Catatan Siswa';
-    public static function canViewAny(): bool
+    public static function canAccess(): bool
     {
         return static::canAccessWithRolesAndModule([
             'Admin Yayasan', 

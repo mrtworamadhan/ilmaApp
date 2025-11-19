@@ -20,7 +20,6 @@ use Illuminate\Database\Eloquent\Builder;
 
 class TeacherResource extends Resource
 {
-    use HasModuleAccess; 
     protected static ?string $model = Teacher::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::User;
@@ -30,7 +29,10 @@ class TeacherResource extends Resource
     protected static ?int $navigationSort = 3;
 
     protected static ?string $recordTitleAttribute = 'name';
-
+    public static function canAccess(): bool
+    {
+        return auth()->user()->hasRole(['Admin Yayasan', 'Admin Sekolah']);
+    }
     public static function getEloquentQuery(): Builder
     {
         $query = parent::getEloquentQuery()

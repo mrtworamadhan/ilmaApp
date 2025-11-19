@@ -22,6 +22,10 @@ class VendorResource extends Resource
 {
     use HasModuleAccess; // 4. Gunakan Trait
     protected static string $requiredModule = 'cashless';
+    public static function canAccess(): bool
+    {
+        return static::canAccessWithRolesAndModule(['Admin Yayasan', 'Admin Sekolah']);
+    }
     protected static ?string $model = Vendor::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBuildingStorefront;

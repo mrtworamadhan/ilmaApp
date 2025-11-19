@@ -14,11 +14,13 @@ use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Illuminate\Database\Eloquent\Builder;
 use Filament\Facades\Filament;
+use Illuminate\Support\Number;
 
 class PaymentForm
 {
     public static function configure(Schema $schema): Schema
     {
+        $foundationId = Filament::getTenant()->id;
         $isYayasanUser = auth()->user()->school_id === null;
         $userSchoolId = auth()->user()->school_id;
 
@@ -48,7 +50,7 @@ class PaymentForm
                     ->label('Siswa')
                     ->relationship(
                         name: 'student',
-                        titleAttribute: 'name',
+                        titleAttribute: 'full_name',
                         modifyQueryUsing: fn (Builder $query) => 
                             $query
                                 ->where('foundation_id', Filament::getTenant()->id)
@@ -59,7 +61,6 @@ class PaymentForm
                     ->live()
                     ->required(),
 
-                // 2. Dropdown Tagihan (Reaktif) - FIXED
                 Select::make('bill_id')
                     ->label('Tagihan yang Dibayar')
                     ->required()
@@ -69,25 +70,18 @@ class PaymentForm
                             return [];
                         }
                         
-                        // Ambil tagihan HANYA dari siswa yg dipilih dan yang statusnya 'unpaid'
+                        // 5. Ambil tagihan gabungan yg belum lunas
                         $bills = Bill::where('student_id', $studentId)
-                                   ->where('status', 'unpaid')
-                                   ->get();
+                            ->whereIn('status', ['unpaid', 'overdue']) // <-- Pakai In
+                            ->get();
                         
-                        // Format options dengan label yang tidak mungkin null
+                        // 6. Format label baru
                         return $bills->mapWithKeys(function ($bill) {
-                            // Buat label yang informatif dan tidak akan null
-                            $label = 'Tagihan #' . $bill->id;
-                            
-                            if ($bill->feeCategory) {
-                                $label .= ' - ' . $bill->feeCategory->name;
-                            }
-                            
-                            $label .= ' - Rp ' . number_format($bill->amount);
-                            
-                            if ($bill->due_date) {
-                                $label .= ' (Jatuh Tempo: ' . $bill->due_date->format('d/m/Y') . ')';
-                            }
+                            $label = sprintf(
+                                "%s (Total: %s)",
+                                $bill->description, // <-- Ambil 'description' baru
+                                Number::currency($bill->total_amount, 'IDR') // <-- Ambil 'total_amount' baru
+                            );
                             
                             return [$bill->id => $label];
                         })->toArray();
@@ -95,24 +89,26 @@ class PaymentForm
                     ->searchable()
                     ->live()
                     ->afterStateUpdated(function ($state, Set $set) {
-                        // Auto-fill nominal
+                        // 7. Auto-fill nominal dari 'total_amount'
                         if ($state) {
                             $bill = Bill::find($state);
                             if ($bill) {
-                                $set('amount_paid', $bill->amount);
+                                $set('amount_paid', $bill->total_amount); // <-- PERBAIKAN
                             }
                         }
                     })
                     ->helperText('Hanya tagihan yang "Belum Lunas" akan muncul di sini'),
 
-                // 3. Nominal (Otomatis terisi)
+                // Field 'amount_paid' (Logika Anda sudah benar)
                 TextInput::make('amount_paid')
                     ->label('Nominal Pembayaran (Rp)')
                     ->required()
                     ->numeric()
-                    ->prefix('Rp'),
+                    ->prefix('Rp')
+                    // 8. Kita biarkan bisa diedit untuk bayar parsial
+                    ->helperText('Otomatis terisi, tapi bisa diubah jika bayar parsial.'),
 
-                // 4. Metode Bayar
+                // Sisa field (Logika Anda sudah benar)
                 Select::make('payment_method')
                     ->label('Metode Pembayaran')
                     ->options([
@@ -131,9 +127,9 @@ class PaymentForm
                     ->label('Catatan (Opsional)')
                     ->columnSpanFull(),
 
-                // Sembunyikan field ini, akan diisi otomatis
                 Hidden::make('status')->default('success'),
                 Hidden::make('payment_for')->default('bill'),
-            ]);
+            ])
+            ->columns(2);
     }
 }

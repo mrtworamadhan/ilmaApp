@@ -23,7 +23,7 @@ class PayslipResource extends Resource
     use HasModuleAccess;
     protected static string $requiredModule = 'payroll';
 
-    public static function canViewAny(): bool
+    public static function canAccess(): bool
     {
         return static::canAccessWithRolesAndModule(['Admin Yayasan']);
     }

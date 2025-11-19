@@ -16,16 +16,23 @@ class Budget extends Model
     {
         return $this->belongsTo(Foundation::class);
     }
-
-    // TAMBAHKAN RELASI INI:
     public function department(): BelongsTo
     {
         return $this->belongsTo(Department::class);
     }
 
-    // 'items' adalah nama relasi untuk Repeater di Filament nanti
     public function items(): HasMany
     {
         return $this->hasMany(BudgetItem::class);
+    }
+    public function cashSourceAccount(): BelongsTo
+    {
+        return $this->belongsTo(Account::class, 'cash_source_account_id');
+    }
+
+
+    public function restrictedFundAccount(): BelongsTo
+    {
+        return $this->belongsTo(Account::class, 'restricted_fund_account_id');
     }
 }

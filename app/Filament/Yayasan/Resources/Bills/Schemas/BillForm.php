@@ -2,11 +2,15 @@
 
 namespace App\Filament\Yayasan\Resources\Bills\Schemas;
 
+use App\Models\FeeCategory;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Illuminate\Database\Eloquent\Builder;
 use Filament\Facades\Filament;
@@ -59,36 +63,20 @@ class BillForm
                     ->columnSpanFull(),
 
                 // 2. Dropdown Kategori Biaya
-                Select::make('fee_category_id')
-                    ->label('Kategori Biaya')
-                    ->relationship(
-                        name: 'feeCategory',
-                        titleAttribute: 'name',
-                        // Filter kategori hanya milik yayasan ini
-                        modifyQueryUsing: fn (Builder $query) => 
-                            $query->where('foundation_id', Filament::getTenant()->id)
-                    )
-                    ->searchable()
-                    ->preload()
-                    ->required(),
-
-                // 3. Nominal
-                TextInput::make('amount')
-                    ->label('Nominal (Rp)')
+                Textarea::make('description')
+                    ->label('Keterangan (Judul Tagihan)')
+                    ->helperText('Misal: "Tagihan Manual - Buku Paket Kelas 1"')
                     ->required()
-                    ->numeric()
-                    ->prefix('Rp'),
-
-                // 4. Tanggal Jatuh Tempo
+                    ->columnSpan(2),
+                
                 DatePicker::make('due_date')
                     ->label('Jatuh Tempo')
                     ->required()
-                    ->default(now()->addDays(10)), // Default 10 hari dari sekarang
+                    ->default(now()->addDays(10)),
 
-                // 5. Status
                 Select::make('status')
                     ->label('Status Tagihan')
-                    ->options([ // Sesuai ERD
+                    ->options([
                         'unpaid' => 'Belum Lunas (Unpaid)',
                         'paid' => 'Lunas (Paid)',
                         'overdue' => 'Jatuh Tempo (Overdue)',
@@ -97,15 +85,67 @@ class BillForm
                     ->default('unpaid')
                     ->required(),
                 
-                // 6. Bulan (Opsional)
                 TextInput::make('month')
                     ->label('Bulan Tagihan (Opsional)')
-                    ->helperText('Isi jika ini tagihan bulanan. Format: YYYY-MM (Contoh: 2025-10)'),
+                    ->helperText('Format: YYYY-MM (Contoh: 2025-10)'),
 
-                // 7. Keterangan
-                Textarea::make('description')
-                    ->label('Keterangan (Opsional)')
+                // ===================================================
+                // PENGGANTI 'fee_category_id' dan 'amount'
+                // ===================================================
+                Repeater::make('items') // <-- Nama relasi 'items()'
+                    ->label('Rincian Item Tagihan')
+                    ->relationship() // <-- Menghubungkan ke relasi BillItem
+                    ->schema([
+                        Select::make('fee_category_id')
+                            ->label('Kategori Biaya')
+                            ->options(
+                                FeeCategory::where('foundation_id', Filament::getTenant()->id)
+                                    ->pluck('name', 'id')
+                            )
+                            ->searchable()
+                            ->preload()
+                            ->required()
+                            ->live()
+                            // Otomatis isi 'description' saat dipilih
+                            ->afterStateUpdated(function (Set $set, ?string $state) {
+                                $feeCategory = FeeCategory::find(id: $state);
+                                if ($feeCategory) {
+                                    $set('description', $feeCategory->name);
+                                }
+                            }),
+
+                        TextInput::make('description')
+                            ->label('Deskripsi Item')
+                            ->required(),
+                        
+                        TextInput::make('amount')
+                            ->label('Nominal (Rp)')
+                            ->numeric()
+                            ->prefix('Rp')
+                            ->required()
+                            ->live(onBlur: true), // <-- 'live' untuk hitung total
+                    ])
+                    ->columns(3)
+                    ->addActionLabel('Tambah Rincian')
+                    ->defaultItems(1) // Minimal 1 rincian
+                    ->live() // <-- 'live' agar Repeater menghitung
+                    ->afterStateUpdated(function (Get $get, Set $set) {
+                        // OTOMATIS HITUNG TOTAL
+                        $items = $get('items') ?? [];
+                        $total = collect($items)->sum(fn($item) => (float)$item['amount']);
+                        $set('total_amount', $total);
+                    })
                     ->columnSpanFull(),
-            ]);
+
+                // Field 'total_amount' (Baru)
+                TextInput::make('total_amount')
+                    ->label('Total Tagihan (Otomatis)')
+                    ->numeric()
+                    ->prefix('Rp')
+                    ->disabled() // Dikunci (read-only)
+                    ->dehydrated() // Paksa kirim ke database
+                    ->required(),
+            ])
+            ->columns(2);
     }
 }

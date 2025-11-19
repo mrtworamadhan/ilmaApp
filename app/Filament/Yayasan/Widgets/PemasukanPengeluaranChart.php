@@ -2,6 +2,7 @@
 
 namespace App\Filament\Yayasan\Widgets;
 
+use App\Filament\Traits\HasModuleAccess;
 use App\Models\JournalEntry;
 use App\Models\Foundation;
 use Carbon\Carbon;
@@ -13,12 +14,13 @@ use Illuminate\Support\Facades\DB;
 
 class PemasukanPengeluaranChart extends ChartWidget
 {
+    use HasModuleAccess;
+    protected static string $requiredModule = 'finance';
     public static function canView(): bool
     {
-        $tenant = Filament::getTenant();
-        // Cek apakah tenant ada DAN modul 'finance' aktif
-        return $tenant instanceof Foundation && $tenant->hasModule('finance');
+        return static::canAccessWithRolesAndModule(['Admin Yayasan', 'Admin Sekolah']);
     }
+
     protected ?string $heading = 'Grafik Pemasukan vs Pengeluaran (6 Bulan Terakhir)';
     protected static ?int $sort = 2;
     protected int | string | array $columnSpan = 'full';

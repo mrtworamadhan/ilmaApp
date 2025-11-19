@@ -2,6 +2,7 @@
 
 namespace App\Filament\Yayasan\Resources\DisbursementRequests\Tables;
 
+use App\Filament\Yayasan\Resources\Expenses\ExpenseResource;
 use App\Models\DisbursementRequest;
 use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
@@ -26,6 +27,7 @@ class DisbursementRequestsTable
                 ->label('Diajukan Oleh')
                 ->searchable(),
             TextColumn::make('requested_amount')
+                ->label('Jumlah Diajukan')
                 ->numeric(locale: 'id')
                 ->money('IDR'),
             TextColumn::make('status')
@@ -83,6 +85,21 @@ class DisbursementRequestsTable
                         $userHasAccess = auth()->user()?->hasRole(['Admin Sekolah', 'Admin Yayasan']) ?? false;                        // Tampilkan HANYA jika status PENDING DAN user punya hak
                         return $record->status === 'PENDING' && $userHasAccess;
                     }),
+                Action::make('record_realization')
+                    ->label('Catat Realisasi')
+                    ->icon('heroicon-o-document-check')
+                    ->color('success')
+                    // Hanya tampil jika:
+                    // 1. Statusnya APPROVED
+                    // 2. User adalah Admin Yayasan
+                    ->visible(fn (DisbursementRequest $record) => 
+                        $record->status === 'APPROVED' && 
+                        Auth::user()->hasRole(['Admin Sekolah', 'Admin Yayasan'])
+                    )
+                    // Arahkan ke Form Buat Expense sambil membawa ID ajuan
+                    ->url(fn (DisbursementRequest $record): string => 
+                        ExpenseResource::getUrl('create', ['disbursement_request_id' => $record->id])
+                    ),
 
             ])
 

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Yayasan\Widgets;
 
+use App\Filament\Traits\HasModuleAccess;
 use App\Models\Account;
 use App\Models\BudgetItem;
 use App\Models\Department;
@@ -17,17 +18,20 @@ use Illuminate\Support\Number;
 
 class DashboardFinancialOverview extends BaseWidget
 {
+    use HasModuleAccess;
     // Atur urutan, letakkan di bawah (setelah charts)
     protected static ?int $sort = 3;
 
-    /**
-     * Tampilkan widget ini HANYA untuk Admin Yayasan dan Admin Sekolah.
-     */
+    protected static string $requiredModule = 'finance';
     public static function canView(): bool
     {
-        $tenant = Filament::getTenant();
-        return $tenant instanceof Foundation && $tenant->hasModule('finance');
+        return static::canAccessWithRolesAndModule(['Admin Yayasan', 'Admin Sekolah']);
     }
+    // public static function canView(): bool
+    // {
+    //     $tenant = Filament::getTenant();
+    //     return $tenant instanceof Foundation && $tenant->hasModule('finance');
+    // }
 
     protected function getStats(): array
     {

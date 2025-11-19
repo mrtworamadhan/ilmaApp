@@ -31,7 +31,7 @@ class XenditService
                 ->post('https://api.xendit.co/callback_virtual_accounts', [
                     'external_id' => $externalId,
                     'bank_code' => 'MANDIRI',
-                    'name' => $student->name,
+                    'name' => $student->full_name,
                     'is_reusable' => true,
                     'is_closed' => false,
                 ]);

@@ -4,71 +4,100 @@ namespace App\Policies;
 
 use App\Models\DisbursementRequest;
 use App\Models\User;
-use Illuminate\Auth\Access\HandlesAuthorization;
+use Illuminate\Auth\Access\Response;
 
 class DisbursementRequestPolicy
 {
-    use HandlesAuthorization;
-
     /**
-     * Izinkan Admin Yayasan melihat semua.
-     */
-    public function before(User $user, string $ability): bool|null
-    {
-        if ($user->hasRole('Admin Yayasan')) {
-            return true;
-        }
-        return null;
-    }
-
-    /**
-     * Siapa yang bisa lihat menu Pengajuan Pencairan.
+     * Determine whether the user can view any models.
      */
     public function viewAny(User $user): bool
     {
-        return $user->hasRole(['Admin Sekolah', 'Kepala Bagian']);
+        // Izinkan semua role yang relevan untuk MELIHAT daftar
+        return $user->hasRole(['Admin Yayasan', 'Admin Sekolah', 'Kepala Bagian']);
     }
 
     /**
-     * User bisa melihat detail pengajuan.
+     * Determine whether the user can view the model.
      */
     public function view(User $user, DisbursementRequest $disbursementRequest): bool
     {
-        if ($user->hasRole('Admin Sekolah')) {
-            // Pastikan admin sekolah & pengajuan ada di sekolah yg sama
-            return $user->school_id === $disbursementRequest->budgetItem->budget->department->school_id;
+        // Izinkan jika user adalah Admin Yayasan (bisa lihat semua)
+        if ($user->hasRole('Admin Yayasan')) {
+            return true;
         }
 
-        if ($user->hasRole('Kepala Bagian')) {
-            // Pastikan ini adalah pengajuan miliknya
-            return $user->id === $disbursementRequest->requester_id;
+        // Izinkan jika user adalah pembuatnya (requester)
+        if ($user->id === $disbursementRequest->requester_id) {
+            return true;
+        }
+        
+        // Izinkan jika user adalah Admin Sekolah dari sekolah yang sama
+        if ($user->hasRole('Admin Sekolah') && $user->school_id === $disbursementRequest->school_id) {
+            return true;
         }
 
         return false;
     }
 
     /**
-     * Hanya Kepala Bagian yang bisa MEMBUAT pengajuan.
+     * Determine whether the user can create models.
      */
     public function create(User $user): bool
     {
-        return $user->hasRole('Kepala Bagian');
+        // ========================================================
+        // REFACTOR DIMULAI DI SINI
+        // ========================================================
+        
+        // HANYA Admin Sekolah dan Kepala Bagian yang bisa MENGAJUKAN
+        return $user->hasRole(['Kepala Bagian']);
+
+        // ========================================================
+        // REFACTOR SELESAI
+        // ========================================================
     }
 
     /**
-     * User bisa mengedit pengajuan JIKA statusnya masih PENDING.
+     * Determine whether the user can update the model.
      */
     public function update(User $user, DisbursementRequest $disbursementRequest): bool
     {
-        // Hanya bisa edit jika masih PENDING dan dia adalah pembuatnya
-        return $disbursementRequest->status === 'PENDING' && $user->id === $disbursementRequest->requester_id;
+        // Hanya Admin Yayasan yang bisa menyetujui/mengubah status
+        if ($user->hasRole('Admin Yayasan')) {
+            return true;
+        }
+
+        // Izinkan pembuat untuk mengedit jika status masih PENDING
+        return $user->id === $disbursementRequest->requester_id && $disbursementRequest->status === 'PENDING';
     }
 
     /**
-     * Hanya Admin Sekolah yang bisa menghapus (jika masih PENDING)
+     * Determine whether the user can delete the model.
      */
     public function delete(User $user, DisbursementRequest $disbursementRequest): bool
     {
-        return $user->hasRole('Admin Sekolah') && $disbursementRequest->status === 'PENDING';
+        // Izinkan Admin Yayasan menghapus
+        if ($user->hasRole('Admin Yayasan')) {
+            return true;
+        }
+        
+        // Izinkan pembuat menghapus jika status masih PENDING
+        return $user->id === $disbursementRequest->requester_id && $disbursementRequest->status === 'PENDING';
+    }
+
+    /**
+     * Determine whether the user can restore the model.
+     */
+    public function restore(User $user, DisbursementRequest $disbursementRequest): bool
+    {
+        return $user->hasRole('Admin Yayasan');
+    }
+
+    /**
+     * Determine whether the user can permanently delete the model.
+     */
+    public function forceDelete(User $user, DisbursementRequest $disbursementRequest): bool
+    {
+        return $user->hasRole('Admin Yayasan');
     }
 }

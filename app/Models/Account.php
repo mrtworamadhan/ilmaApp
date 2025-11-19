@@ -18,6 +18,8 @@ class Account extends Model
         'type',
         'category',
         'parent_id',
+        'normal_balance',
+        'system_code',
     ];
 
     // Relasi ke Yayasan (Tenant)

@@ -23,9 +23,9 @@ class DisbursementRequestResource extends Resource
 {
     use HasModuleAccess;
     protected static string $requiredModule = 'finance';
-    public static function canViewAny(): bool
+    public static function canAccess(): bool
     {
-        return static::canAccessWithRolesAndModule(['Admin Yayasan', 'Admin Sekolah']);
+        return static::canAccessWithRolesAndModule(['Admin Yayasan', 'Admin Sekolah', 'Kepala Bagian']);
     }
     
     protected static ?string $model = DisbursementRequest::class;
@@ -37,25 +37,44 @@ class DisbursementRequestResource extends Resource
     protected static ?int $navigationSort = 2;
 
     protected static ?string $navigationLabel = 'Pengajuan Pencairan';
-    // public static function getEloquentQuery(): Builder
-    // {
-    //     // 1. Ambil query dasar (sudah di-scope ke Tenant/Yayasan)
-    //     $query = parent::getEloquentQuery()
-    //                 ->where('foundation_id', Filament::getTenant()->id);
+    
+    public static function getEloquentQuery(): Builder
+    {
+        $user = auth()->user();
+        $foundationId = Filament::getTenant()->id;
 
-    //     // 2. Cek apakah user ini level Sekolah?
-    //     $userSchoolId = auth()->user()->school_id;
+        // 1. Ambil query dasar (selalu di-scope ke Yayasan/Tenant)
+        $query = parent::getEloquentQuery()
+                    ->where('foundation_id', $foundationId);
+
+        // 2. CEK LEVEL 1 (Paling Spesifik): KEPALA BAGIAN
+        // (Logic ini SUDAH BENAR)
+        if ($user->hasRole('Kepala Bagian') && $user->department_id) {
+            
+            return $query->whereHas('budgetItem.budget', function (Builder $q) use ($user) {
+                $q->where('department_id', $user->department_id);
+            });
+        }
+
+        // 3. CEK LEVEL 2: ADMIN SEKOLAH
+        // (Ini hanya berjalan jika user BUKAN Kepala Bagian)
+        if ($user->hasRole(['Admin Sekolah']) && $user->school_id) {
+            
+            // V-- INI DIA PERBAIKANNYA (LOGIC "LOMPAT" 4 TABEL) --V
+
+            // Tampilkan Pengajuan...
+            return $query->whereHas('budgetItem.budget.department', function (Builder $q) use ($user) {
+                // ...yang departemen-nya punya school_id yang sama dengan user
+                $q->where('school_id', $user->school_id);
+            });
+
+            // ^-- BATAS AKHIR PERBAIKAN --^
+        }
         
-    //     if ($userSchoolId) {
-    //         // 3. Jika ya, paksa query HANYA tampilkan siswa
-    //         // dari sekolah milik user tsb.
-    //         $query->where('school_id', $userSchoolId);
-    //     }
-
-    //     // 4. Jika tidak (level Yayasan), kembalikan query langkah 1
-    //     return $query;
-    // }
-
+        // 4. LEVEL 3: ADMIN YAYASAN
+        // (Jika bukan keduanya, kembalikan semua data di yayasannya)
+        return $query;
+    }
     public static function form(Schema $schema): Schema
     {
         return DisbursementRequestForm::configure($schema);

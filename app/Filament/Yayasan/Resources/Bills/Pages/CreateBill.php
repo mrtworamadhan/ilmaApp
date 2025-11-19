@@ -11,30 +11,28 @@ class CreateBill extends CreateRecord
 {
     protected static string $resource = BillResource::class;
     
-    protected function handleRecordCreation(array $data): \Illuminate\Database\Eloquent\Model
+    protected function mutateDataBeforeCreate(array $data): array
     {
-        // 1. Selalu sisipkan ID Yayasan
+        // 1. Hitung total_amount dari rincian 'items'
+        $total = 0;
+        if (isset($data['items'])) {
+            $total = collect($data['items'])->sum(fn($item) => (float)$item['amount']);
+        }
+        $data['total_amount'] = $total;
+
+        // 2. Sisipkan ID Yayasan
         $data['foundation_id'] = Filament::getTenant()->id;
         
-        // 2. Ambil 'school_id' dari siswa yang dipilih
-        $student = Student::find($data['student_id']);
-        
-        if (!$student) {
-            throw new \Exception("Student dengan ID {$data['student_id']} tidak ditemukan.");
+        // 3. Sisipkan school_id jika user adalah Admin Sekolah
+        if (auth()->user()->school_id) {
+            $data['school_id'] = auth()->user()->school_id;
         }
-        
-        if (empty($student->school_id)) {
-            throw new \Exception("Student '{$student->full_name}' tidak memiliki school_id.");
-        }
-        
-        $data['school_id'] = $student->school_id;
+        // Jika Admin Yayasan, 'school_id' sudah terisi otomatis
+        // oleh 'afterStateUpdated' di 'student_id'
 
-        // Debug final data
-        \Log::info('Final Bill Data before create:', $data);
-
-        // Create record dengan data yang sudah dimodifikasi
-        return static::getModel()::create($data);
+        return $data;
     }
+    
     protected function getRedirectUrl(): string
     {
         return $this->getResource()::getUrl('index');

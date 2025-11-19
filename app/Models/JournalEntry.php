@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+
 class JournalEntry extends Model
 {
     use HasFactory;
@@ -21,7 +22,6 @@ class JournalEntry extends Model
         'amount',
     ];
 
-    // Relasi ke Induk Jurnal
     public function journal(): BelongsTo
     {
         return $this->belongsTo(Journal::class);
@@ -32,4 +32,16 @@ class JournalEntry extends Model
     {
         return $this->belongsTo(Account::class);
     }
+    public function getDebitAmountAttribute()
+    {
+        return $this->type === 'debit' ? $this->amount : 0;
+    }
+
+    public function getCreditAmountAttribute()
+    {
+        return $this->type === 'kredit' ? $this->amount : 0;
+    }
+
+    // Pastikan accessor ini termasuk dalam appends
+    protected $appends = ['debit_amount', 'credit_amount'];
 }

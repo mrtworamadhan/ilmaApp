@@ -39,7 +39,7 @@ class SchoolClassResource extends Resource
     protected static string | UnitEnum | null $navigationGroup  = 'Data Master';
     protected static ?int $navigationSort = 1;
 
-    public static function canViewAny(): bool
+    public static function canAccess(): bool
     {
         return auth()->user()->hasRole(['Admin Yayasan', 'Admin Sekolah']);
     }

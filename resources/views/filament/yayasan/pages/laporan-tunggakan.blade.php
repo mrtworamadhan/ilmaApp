@@ -3,7 +3,7 @@
     {{-- 1. Render Form Filter --}}
     <x-filament::section icon="heroicon-o-funnel" heading="Filter Laporan">
         {{-- Tombol submit tidak perlu lagi karena form 'live' --}}
-        {{ $this->filterForm }}
+        {{ $this->form }}
         <x-filament::button type="submit" icon="heroicon-o-funnel">
             Terapkan Filter
         </x-filament::button>

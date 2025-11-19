@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\Bill;
+use App\Models\BillItem;
 use App\Models\FeeStructure;
 use App\Models\Student;
 use Illuminate\Console\Command;
@@ -12,164 +13,185 @@ use Illuminate\Support\Facades\Log;
 
 class GenerateBillsCommand extends Command
 {
-    /**
-     * The name and signature of the console command.
-     *
-     * @var string
-     */
-    // Nama perintah kita: php artisan app:generate-bills
     protected $signature = 'app:generate-bills';
+    protected $description = 'Generate consolidated monthly and yearly bills for all active students';
 
-    /**
-     * The console command description.
-     *
-     * @var string
-     */
-    protected $description = 'Generate monthly and yearly bills automatically based on fee structures';
-
-    /**
-     * Execute the console command.
-     */
     public function handle()
     {
-        Log::channel('cron')->info('Starting GenerateBillsCommand...');
-        $this->info('Starting bill generation...');
+        Log::channel('cron')->info('Starting GenerateBillsCommand (Consolidated)...');
+        $this->info('Starting Consolidated Bill Generation...');
 
         $today = Carbon::today();
-        $currentMonthYear = $today->format('Y-m'); // Format: 2025-10
-        $currentYear = $today->year;
-        $currentMonth = $today->month; // Angka bulan (1-12)
-
-        // Tentukan bulan untuk tagihan tahunan (misal: Juli)
+        $currentMonthYear = $today->format('Y-m'); 
+        $currentYear = $today->year; 
+        $currentMonth = $today->month;
         $yearlyBillingMonth = 7; // Juli
 
-        // --- 1. Ambil Semua Aturan Biaya Aktif ---
-        $feeStructures = FeeStructure::where('is_active', true)
-                            ->with(['school', 'feeCategory']) // Eager load relasi
-                            ->get();
+        $this->info("Billing period: {$currentMonthYear} (Yearly month: {$yearlyBillingMonth})");
 
-        if ($feeStructures->isEmpty()) {
-            Log::channel('cron')->warning('No active fee structures found. Exiting.');
-            $this->warn('No active fee structures found.');
-            return 1; // Keluar jika tidak ada aturan
+        // 1. Ambil semua siswa aktif
+        $students = Student::with(['schoolClass', 'optionalFees']) 
+                        ->where('status', 'active')
+                        ->get();
+        
+        if ($students->isEmpty()) {
+            Log::channel('cron')->warning('No active students found. Exiting.');
+            $this->warn('No active students found.');
+            return 1;
         }
 
-        // --- 2. Loop Setiap Aturan Biaya ---
-        foreach ($feeStructures as $structure) {
-            $this->info("Processing structure: {$structure->name} (School: {$structure->school->name}, Category: {$structure->feeCategory->name})");
+        $this->info("Found {$students->count()} active students to process.");
+        $totalBillsCreated = 0;
 
-            // Tentukan apakah aturan ini relevan untuk dijalankan sekarang
-            $shouldGenerate = false;
-            $billingMonthYear = null; // Bulan spesifik untuk tagihan
+        // 2. Loop setiap siswa
+        foreach ($students as $student) {
+            
+            // ===================================
+            // LOGGING DETAIL PER SISWA
+            // ===================================
+            $this->info("--- Processing Student: {$student->name} (ID: {$student->id}) ---");
 
-            if ($structure->billing_cycle === 'monthly') {
-                $shouldGenerate = true;
-                $billingMonthYear = $currentMonthYear;
-                Log::channel('cron')->info("Monthly structure identified for {$billingMonthYear}.");
-            } elseif ($structure->billing_cycle === 'yearly' && $currentMonth === $yearlyBillingMonth) {
-                $shouldGenerate = true;
-                $billingMonthYear = $currentYear . '-YEARLY'; // Penanda tagihan tahunan
-                Log::channel('cron')->info("Yearly structure identified for {$billingMonthYear}.");
-            } elseif ($structure->billing_cycle === 'one_time') {
-                // one_time tidak digenerate otomatis di sini, tapi via input manual atau event lain (PPDB)
-                Log::channel('cron')->info("One-time structure skipped.");
+            if (!$student->schoolClass) {
+                $this->warn("   [SKIP] Student ID: {$student->id} (Missing SchoolClass).");
+                Log::channel('cron')->warning("Skipping Student ID: {$student->id} (Missing SchoolClass).");
                 continue;
             }
 
-            if (!$shouldGenerate) {
-                Log::channel('cron')->info("Structure skipped (not relevant for today).");
-                continue; // Lanjut ke aturan berikutnya jika tidak relevan
+            $gradeLevel = $student->schoolClass->grade_level;
+            $schoolId = $student->school_id;
+            $this->info(" -> Checking Data: School ID [{$schoolId}], Grade Level [{$gradeLevel}]");
+            
+            $billingPeriod = $currentMonthYear;
+            if ($currentMonth === $yearlyBillingMonth) {
+                $billingPeriod .= "_Y" . $currentYear;
             }
 
-            // --- 3. Cari Siswa yang Sesuai ---
-            $studentsQuery = Student::where('status', 'active') // Hanya siswa aktif
-                                ->where('school_id', $structure->school_id)
-                                ->with('schoolClass'); // Eager load kelas untuk cek grade_level
+            // 3. Cek Duplikasi
+            $existingBill = Bill::where('student_id', $student->id)
+                                ->where('month', $billingPeriod) 
+                                ->exists();
 
-            // Filter berdasarkan grade_level jika ada di aturan
-            if ($structure->grade_level) {
-                $studentsQuery->whereHas('schoolClass', function ($query) use ($structure) {
-                    $query->where('grade_level', $structure->grade_level);
-                });
-                Log::channel('cron')->info("Filtering students by grade_level: {$structure->grade_level}");
+            if ($existingBill) {
+                $this->warn("   [SKIP] Bill already exists for this period ({$billingPeriod}).");
+                Log::channel('cron')->info("Bill already exists for Student ID {$student->id} for period {$billingPeriod}. Skipping.");
+                continue;
             }
 
-            $students = $studentsQuery->get();
-
-            if ($students->isEmpty()) {
-                Log::channel('cron')->warning("No active students found matching the criteria for structure ID: {$structure->id}");
-                continue; // Lanjut jika tidak ada siswa
+            // 4. Ambil semua ATURAN BIAYA yang cocok (SYARAT 1, 2, 3)
+            $structuresForStudent = FeeStructure::with('feeCategory')
+                                    ->where('school_id', $schoolId) // Syarat 1
+                                    ->where('grade_level', $gradeLevel) // Syarat 2
+                                    ->where('is_active', true) // Syarat 3
+                                    ->get();
+            
+            if ($structuresForStudent->isEmpty()) {
+                $this->warn("   [SKIP] No matching FeeStructures found for School [{$schoolId}] + Grade [{$gradeLevel}].");
+                continue;
             }
+            $this->info(" -> Found {$structuresForStudent->count()} potentially matching FeeStructures.");
 
-             $this->info("Found {$students->count()} students for this structure.");
+            $itemsToBill = []; 
+            $totalAmount = 0;
+            $studentOptionalFeeIds = $student->optionalFees->pluck('id');
 
-            // --- 4. Loop Setiap Siswa & Buat Tagihan ---
-            $billsCreatedCount = 0;
-            foreach ($students as $student) {
-                // Cek apakah siswa ini terdaftar di biaya opsional INI
-                $isOptionalSubscribed = false;
-                if ($structure->billing_cycle !== 'one_time') { // Asumsi biaya opsional itu rutin
-                    // Cek tabel pivot student_optional_fees
-                    $isOptionalSubscribed = DB::table('student_optional_fees')
-                                                ->where('student_id', $student->id)
-                                                ->where('fee_structure_id', $structure->id)
-                                                ->exists();
+            // 5. Loop semua aturan & filter
+            foreach ($structuresForStudent as $structure) {
+                $this->info("   -> Checking Structure: '{$structure->name}' (ID: {$structure->id})");
 
-                    // Jika aturan INI adalah biaya opsional tapi siswa TIDAK subscribe, skip
-                    // Logika ini mengasumsikan SEMUA aturan bisa jadi opsional,
-                    // mungkin perlu penanda 'is_optional' di fee_structures
-                    // Untuk sementara, kita anggap hanya yang ada di pivot yg opsional & wajib ada
-                    // Atau: Jika Kategori BUKAN SPP/Uang Gedung, ANGGAP opsional? -> perlu diskusi
-                    $isPotentiallyOptional = !in_array($structure->feeCategory->name, ['SPP Bulanan', 'Uang Gedung']); // Contoh asumsi
-                    if ($isPotentiallyOptional && !$isOptionalSubscribed) {
-                         Log::channel('cron')->info("Student ID {$student->id} skipped optional fee '{$structure->name}' (not subscribed).");
-                         continue;
+                if (!$structure->feeCategory) {
+                    $this->warn("      [SKIP] FeeStructure ID {$structure->id} missing FeeCategory.");
+                    Log::channel('cron')->error("FeeStructure ID {$structure->id} missing FeeCategory. Skipping item.");
+                    continue;
+                }
+
+                // Cek siklus tagihan (SYARAT 4)
+                $isMonthly = $structure->billing_cycle === 'monthly';
+                $isYearly = ($structure->billing_cycle === 'yearly' && $currentMonth === $yearlyBillingMonth);
+                
+                if (!$isMonthly && !$isYearly) {
+                    $this->warn("      [SKIP] Billing cycle '{$structure->billing_cycle}' is not active this month.");
+                    continue; // Skip 'one_time' atau siklus tidak cocok
+                }
+
+                // Cek Wajib vs Opsional (SYARAT 5)
+                $shouldBeBilled = false;
+
+                if ($structure->feeCategory->is_optional) {
+                    // Jika OPSIONAL
+                    if ($studentOptionalFeeIds->contains($structure->id)) {
+                        $this->info("      [OK] Student IS SUBSCRIBED to this optional fee.");
+                        $shouldBeBilled = true;
+                    } else {
+                        $this->warn("      [SKIP] Student is NOT SUBSCRIBED to this optional fee.");
+                        Log::channel('cron')->info("Student ID {$student->id} skipped optional fee '{$structure->name}' (not subscribed).");
                     }
-                     if ($isOptionalSubscribed) {
-                         Log::channel('cron')->info("Student ID {$student->id} IS subscribed to optional fee '{$structure->name}'.");
-                     }
-
+                } else {
+                    // Jika WAJIB
+                    $this->info("      [OK] This is a WAJIB fee.");
+                    $shouldBeBilled = true;
                 }
-
-
-                // Cek Duplikasi: Apakah sudah ada tagihan untuk siswa ini, kategori ini, dan bulan/tahun ini?
-                $existingBill = Bill::where('student_id', $student->id)
-                                    ->where('fee_category_id', $structure->fee_category_id)
-                                    ->where('month', $billingMonthYear) // Cocokkan bulan/tahun
-                                    ->exists();
-
-                if ($existingBill) {
-                     Log::channel('cron')->info("Bill already exists for Student ID {$student->id}, Category ID {$structure->fee_category_id}, Month {$billingMonthYear}. Skipping.");
-                     continue; // Jangan buat duplikat
-                }
-
-                // Buat Tagihan Baru
-                try {
-                    Bill::create([
-                        'foundation_id' => $student->foundation_id,
-                        'school_id' => $student->school_id,
-                        'student_id' => $student->id,
-                        'fee_category_id' => $structure->fee_category_id,
-                        'amount' => $structure->amount,
-                        'due_date' => $today->copy()->addDays(10)->toDateString(), // Jatuh tempo 10 hari
-                        'month' => $billingMonthYear, // Simpan periode tagihan
-                        'status' => 'unpaid',
-                        'description' => $structure->name . ($billingMonthYear ? " - Periode " . $billingMonthYear : ''),
-                    ]);
-                    $billsCreatedCount++;
-                    Log::channel('cron')->info("Bill created for Student ID {$student->id}, Structure ID {$structure->id}.");
-
-                } catch (\Exception $e) {
-                     Log::channel('cron')->error("Failed to create bill for Student ID {$student->id}, Structure ID {$structure->id}", [
-                        'error' => $e->getMessage()
-                     ]);
+                
+                if ($shouldBeBilled) {
+                    $this->info("      [ADD TO CART] Adding '{$structure->name}' (Rp {$structure->amount})");
+                    $itemsToBill[] = $structure; 
+                    $totalAmount += $structure->amount;
                 }
             }
-             $this->info("Created {$billsCreatedCount} bills for structure: {$structure->name}");
-        }
 
-        Log::channel('cron')->info('GenerateBillsCommand finished.');
-        $this->info('Bill generation finished.');
+            // 6. Jika keranjang kosong, skip
+            if (empty($itemsToBill) || $totalAmount <= 0) {
+                $this->warn("   [FINAL SKIP] No items in cart for this student.");
+                Log::channel('cron')->info("No items to bill for Student ID {$student->id}. Skipping.");
+                continue;
+            }
+
+            // 7. Buat Tagihan
+            $this->info("   >>> CREATING BILL with Total Amount: {$totalAmount}");
+            try {
+                DB::transaction(function () use ($student, $itemsToBill, $totalAmount, $billingPeriod, $today) {
+                    
+                    $parentBill = Bill::create([
+                        'foundation_id' => $student->foundation_id,
+                        'school_id'     => $student->school_id,
+                        'student_id'    => $student->id,
+                        'total_amount'  => $totalAmount, 
+                        'due_date'      => $today->copy()->addDays(10)->toDateString(),
+                        'month'         => $billingPeriod, 
+                        'status'        => 'unpaid',
+                        'description'   => "Tagihan Gabungan - " . $today->format('F Y') . "a/n" . $student->full_name,
+
+                    ]);
+
+                    $itemsData = [];
+                    foreach ($itemsToBill as $itemStructure) {
+                        $itemsData[] = [
+                            'bill_id'            => $parentBill->id,
+                            'fee_structure_id'   => $itemStructure->id,
+                            'fee_category_id'  => $itemStructure->fee_category_id,
+                            'description'        => $itemStructure->name, 
+                            'amount'             => $itemStructure->amount,
+                            'created_at'         => now(),
+                            'updated_at'         => now(),
+                        ];
+                    }
+                    
+                    BillItem::insert($itemsData); 
+                });
+                
+                Log::channel('cron')->info("SUCCESS: Created consolidated bill for Student ID {$student->id} with {$totalAmount}");
+                $this->info("   >>> SUCCESS: Created bill for: {$student->name} (Total: {$totalAmount})");
+                $totalBillsCreated++;
+
+            } catch (\Exception $e) {
+                Log::channel('cron')->error("FAILED to create bill for Student ID {$student->id}", [
+                    'error' => $e->getMessage(),
+                ]);
+                $this->error("   >>> FAILED: {$e->getMessage()}");
+            }
+        } // Akhir loop siswa
+
+        Log::channel('cron')->info("GenerateBillsCommand finished. Created {$totalBillsCreated} consolidated bills.");
+        $this->info("Bill generation finished. Created {$totalBillsCreated} bills.");
         return 0; // Sukses
     }
 }

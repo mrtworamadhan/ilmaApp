@@ -3,6 +3,7 @@
 namespace App\Filament\Yayasan\Pages\Payroll;
 
 use App\Filament\Traits\HasModuleAccess;
+use App\Models\Account; // <-- 1. IMPORT MODEL ACCOUNT
 use App\Models\Expense;
 use App\Models\Payroll\Payslip;
 use App\Models\Teacher;
@@ -27,11 +28,10 @@ class ProcessPayroll extends Page implements HasForms
     use HasModuleAccess;
     protected static string $requiredModule = 'payroll';
 
-    public static function canViewAny(): bool
+    public static function canAccess(): bool // <-- BENAR (Ini untuk Page)
     {
-        return static::canAccessWithRolesAndModule(['Admin Yayasan']);
+        return static::canAccessWithRolesAndModule(['Admin Yayasan', 'Admin Sekolah']);
     }
-
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedCog;
     protected static string | UnitEnum | null $navigationGroup  = 'Payroll';
     protected static ?string $navigationLabel = 'Proses Gaji Bulanan';
@@ -92,7 +92,37 @@ class ProcessPayroll extends Page implements HasForms
 
         Log::info("--- PROSES PAYROLL DIMULAI: Bulan {$month}/{$year} oleh User ID: {$adminUserId} ---");
 
-        // 1. Ambil semua guru di yayasan ini, LENGKAP dengan setting gajinya
+        // ========================================================
+        // REFACTOR DIMULAI DI SINI
+        // ========================================================
+
+        // 1. Ambil Akun Sistem untuk Jurnal
+        $akunBebanGaji = Account::where('foundation_id', $foundationId)
+                               ->where('system_code', 'beban_gaji_default')
+                               ->first();
+
+        $akunKas = Account::where('foundation_id', $foundationId)
+                         ->where('system_code', 'kas_operasional_default')
+                         ->first();
+
+        // Guard Clause: Hentikan proses jika akun sistem tidak ada
+        if (!$akunBebanGaji || !$akunKas) {
+            $missing = !$akunBebanGaji ? 'beban_gaji_default' : 'kas_operasional_default';
+            Log::error("GAGAL TOTAL: Akun sistem '{$missing}' tidak ditemukan untuk Foundation ID: {$foundationId}. Proses payroll dibatalkan.");
+            Notification::make()
+                ->title('Proses Gagal: Akun Sistem Tidak Ditemukan')
+                ->body("Akun '{$missing}' belum di-setup di COA. Hubungi Super Admin.")
+                ->danger()
+                ->send();
+            return; // Hentikan eksekusi
+        }
+
+        // ========================================================
+        // REFACTOR SELESAI
+        // ========================================================
+
+
+        // 2. Ambil semua guru di yayasan ini, LENGKAP dengan setting gajinya
         $teachers = Teacher::where('foundation_id', $foundationId)
             ->with('payrolls.payrollComponent') // Eager load setting gajinya
             ->get();
@@ -101,7 +131,7 @@ class ProcessPayroll extends Page implements HasForms
         $skippedCount = 0;
 
         foreach ($teachers as $teacher) {
-            // 2. Cek apakah slip gaji sudah ada
+            // 3. Cek apakah slip gaji sudah ada
             $existing = Payslip::where('teacher_id', $teacher->id)
                 ->where('month', $month)
                 ->where('year', $year)
@@ -113,14 +143,14 @@ class ProcessPayroll extends Page implements HasForms
                 continue; // Lanjut ke guru berikutnya
             }
 
-            // 3. Hitung Gaji
+            // 4. Hitung Gaji
             $totalAllowance = $teacher->payrolls->where('payrollComponent.type', 'allowance')->sum('amount');
             $totalDeduction = $teacher->payrolls->where('payrollComponent.type', 'deduction')->sum('amount');
             $netPay = $totalAllowance - $totalDeduction;
 
-            // 4. Proses dalam Transaksi Database
+            // 5. Proses dalam Transaksi Database
             try {
-                DB::transaction(function () use ($teacher, $month, $year, $totalAllowance, $totalDeduction, $netPay, $adminUserId) {
+                DB::transaction(function () use ($teacher, $month, $year, $totalAllowance, $totalDeduction, $netPay, $adminUserId, $akunBebanGaji, $akunKas) {
                     
                     // A. Buat Header Slip Gaji (Payslip)
                     $payslip = Payslip::create([
@@ -145,11 +175,12 @@ class ProcessPayroll extends Page implements HasForms
                     }
 
                     // C. Integrasi: Buat Expense (Ini akan memicu ExpenseObserver)
+                    // REFACTOR: Gunakan ID akun dinamis
                     $expense = Expense::create([
                         'foundation_id' => $teacher->foundation_id,
                         'school_id' => $teacher->school_id,
-                        'expense_account_id' => 1, 
-                        'cash_account_id' => 2, 
+                        'expense_account_id' => $akunBebanGaji->id, // <-- REFACTOR
+                        'cash_account_id' => $akunKas->id,       // <-- REFACTOR
                         'amount' => $netPay,
                         'description' => "Pembayaran Gaji: {$teacher->full_name} - {$month}/{$year}",
                         'date' => now(),
@@ -174,7 +205,7 @@ class ProcessPayroll extends Page implements HasForms
             }
         }
 
-        // 5. Kirim Notifikasi Sukses
+        // 6. Kirim Notifikasi Sukses
         Log::info("--- PROSES PAYROLL SELESAI ---");
         Notification::make()
             ->title('Proses Gaji Selesai')

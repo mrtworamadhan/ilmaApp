@@ -35,7 +35,7 @@ class StudentAttendanceResource extends Resource
     protected static ?string $pluralLabel = 'Log Absensi';
     protected static ?int $navigationSort = 2;
 
-    public static function canViewAny(): bool
+    public static function canAccess(): bool
     {
         return static::canAccessWithRolesAndModule([
             'Admin Yayasan', 
